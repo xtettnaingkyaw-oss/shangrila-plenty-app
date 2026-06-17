@@ -241,3 +241,152 @@ export default function App() {
                     onClick={copyPublicLink}
                     className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-colors shadow-sm"
                   >
+                    <Share2 size={18} /> Public Link
+                  </button>
+                )}
+                <div className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
+                  <User size={18} /> စုစုပေါင်း: {THERAPISTS.length}
+                </div>
+              </div>
+            </div>
+
+            {!isFirebaseEnabled && !isPublicMode && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg flex items-start gap-3">
+                <AlertCircle className="flex-shrink-0 mt-0.5" size={20} />
+                <p className="text-sm">
+                  <strong>သတိပြုရန်:</strong> လက်ရှိတွင် Database မချိတ်ဆက်ရသေးသဖြင့် အခြားဖုန်းများမှ ဝင်ကြည့်ပါက ဒေတာများ မြင်ရမည်မဟုတ်ပါ။ တကယ့်အပြင်တွင် သုံးရန် Firebase Config ထည့်သွင်းရန် လိုအပ်ပါသည်။
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {getTherapistStats().map((t) => (
+                <div key={t.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 relative overflow-hidden">
+                  {t.totalAmount > 0 && (
+                    <div className="absolute top-0 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded-bl-lg font-bold shadow-sm">
+                      ဒဏ်ကြေးရှိ
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${t.totalAmount > 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                      {t.id}
+                    </div>
+                    <h3 className="font-bold text-lg text-slate-800">{t.name}</h3>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">အကြိမ်အရေအတွက်:</span>
+                      <span className="font-medium text-slate-700">{t.violationCount} ကြိမ်</span>
+                    </div>
+                    <div className="flex justify-between text-sm pt-2 border-t border-slate-100">
+                      <span className="text-slate-500">စုစုပေါင်း (ကျပ်):</span>
+                      <span className={`font-bold ${t.totalAmount > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {t.totalAmount.toLocaleString()} Ks
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'add' && (
+          <div className="max-w-2xl mx-auto space-y-6">
+            <h2 className="text-2xl font-bold text-emerald-900 pb-4 border-b">ဒဏ်ကြေးအသစ် မှတ်တမ်းတင်ရန်</h2>
+            <form onSubmit={handleSubmitPenalty} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-5">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <User size={16} className="text-amber-500" /> ဝန်ထမ်း
+                </label>
+                <select name="therapistId" value={formData.therapistId} onChange={handleInputChange} className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none">
+                  {THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Calendar size={16} className="text-amber-500" /> ရက်စွဲ
+                </label>
+                <input type="date" name="date" value={formData.date} onChange={handleInputChange} className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none" required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <AlertCircle size={16} className="text-amber-500" /> ဖောက်ဖျက်မှု အမျိုးအစား
+                </label>
+                <select name="category" value={formData.category} onChange={handleInputChange} className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none">
+                  {CATEGORIES.map((cat, idx) => <option key={idx} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <DollarSign size={16} className="text-amber-500" /> ပမာဏ (ကျပ်)
+                </label>
+                <input type="number" name="amount" value={formData.amount} onChange={handleInputChange} placeholder="5000" className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none" required min="0" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Info size={16} className="text-amber-500" /> မှတ်ချက်
+                </label>
+                <textarea name="remark" value={formData.remark} onChange={handleInputChange} placeholder="အသေးစိတ်ရေးရန်..." rows={3} className="w-full p-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-amber-500 outline-none resize-none"></textarea>
+              </div>
+              <button type="submit" className="w-full bg-emerald-900 hover:bg-emerald-800 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <PlusCircle size={20} /> မှတ်တမ်းတင်မည်
+              </button>
+            </form>
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-emerald-900 pb-4 border-b">ဒဏ်ကြေးမှတ်တမ်းများ</h2>
+            {penalties.length === 0 ? (
+              <div className="bg-white p-12 rounded-xl shadow-sm border border-slate-200 text-center text-slate-500 flex flex-col items-center">
+                <ClipboardList size={48} className="text-slate-300 mb-3" />
+                <p>မှတ်တမ်းတင်ထားသော ဒဏ်ကြေးများ မရှိသေးပါ။</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-sm uppercase">
+                        <th className="p-4">ရက်စွဲ</th>
+                        <th className="p-4">ဝန်ထမ်းအမည်</th>
+                        <th className="p-4">အမျိုးအစား / မှတ်ချက်</th>
+                        <th className="p-4 text-right">ပမာဏ (ကျပ်)</th>
+                        <th className="p-4 text-center">လုပ်ဆောင်ချက်</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {penalties.map((penalty) => (
+                        <tr key={penalty.id} className="hover:bg-slate-50">
+                          <td className="p-4 whitespace-nowrap text-sm text-slate-600">{penalty.date}</td>
+                          <td className="p-4 whitespace-nowrap font-medium text-slate-800">
+                            <span className="bg-emerald-100 text-emerald-800 py-1 px-2 rounded text-xs mr-2">No-{penalty.therapistId}</span>
+                            {penalty.therapistName}
+                          </td>
+                          <td className="p-4">
+                            <p className="text-sm font-medium text-slate-800">{penalty.category}</p>
+                            {penalty.remark && <p className="text-xs text-slate-500 mt-1">{penalty.remark}</p>}
+                          </td>
+                          <td className="p-4 whitespace-nowrap text-right font-bold text-red-600">
+                            {penalty.amount.toLocaleString()}
+                          </td>
+                          <td className="p-4 whitespace-nowrap text-center">
+                            <button onClick={() => handleDelete(penalty.id)} className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50" title="ဖျက်ရန်">
+                              <Trash2 size={18} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
