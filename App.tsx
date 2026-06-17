@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, query, orderBy } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Home, FilePlus, ClipboardList, Trash2, X, Share2, Download, CheckCircle } from 'lucide-react';
+import { Home, FilePlus, ClipboardList, Trash2, X, Share2, Download, CheckCircle, Calendar } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA7wnYTB2uevwYl3atyTJ2EZSFc8r65eR4",
@@ -28,6 +28,15 @@ export default function App() {
   const [selectedTherapist, setSelectedTherapist] = useState<any>(null);
   const [formData, setFormData] = useState({ therapistId: '1', category: CATEGORIES[0], amount: '', remark: '', date: new Date().toISOString().split('T')[0] });
 
+  // လက်ရှိလ၏ ပထမရက် နှင့် နောက်ဆုံးရက် ကို ရှာဖွေခြင်း
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
+  const lastDayOfMonth = new Date(currentYear, today.getMonth() + 1, 0).getDate();
+  
+  const [startDate, setStartDate] = useState(`${currentYear}-${currentMonth}-01`);
+  const [endDate, setEndDate] = useState(`${currentYear}-${currentMonth}-${lastDayOfMonth}`);
+
   useEffect(() => {
     if (window.location.search.includes('mode=public')) setIsPublic(true);
     signInAnonymously(auth);
@@ -37,12 +46,18 @@ export default function App() {
     });
   }, []);
 
+  // ရက်စွဲအလိုက် စစ်ထုတ်ထားသော Data များ (Filter)
+  const filteredPenalties = penalties.filter(p => {
+    const pDate = p.date;
+    return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate);
+  });
+
   const getDaysOverdue = (dateStr: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const dToday = new Date();
+    dToday.setHours(0, 0, 0, 0);
     const pDate = new Date(dateStr);
     pDate.setHours(0, 0, 0, 0);
-    const diffTime = today.getTime() - pDate.getTime();
+    const diffTime = dToday.getTime() - pDate.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
   };
@@ -54,7 +69,8 @@ export default function App() {
   };
 
   const getStats = (id: string) => {
-    const p = penalties.filter(item => String(item.therapistId) === id);
+    // စစ်ထုတ်ထားသော filteredPenalties ကို အသုံးပြုမည်
+    const p = filteredPenalties.filter(item => String(item.therapistId) === id);
     const unpaid = p.filter(item => !item.isPaid);
     const paid = p.filter(item => item.isPaid);
     
@@ -118,6 +134,20 @@ export default function App() {
 
       <main className="p-4 max-w-4xl mx-auto print-section">
         
+        {/* Date Filter Bar (Dashboard နှင့် History အတွက်သာ) */}
+        {(activeTab === 'dashboard' || activeTab === 'history') && (
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4 flex flex-col sm:flex-row gap-4 items-center justify-between no-print">
+            <h2 className="font-bold text-emerald-900 flex items-center gap-2">
+              <Calendar size={20} /> ရက်စွဲအလိုက် ကြည့်ရန်
+            </h2>
+            <div className="flex gap-2 items-center w-full sm:w-auto">
+              <input type="date" className="border border-slate-300 p-2 rounded outline-none focus:ring-2 focus:ring-emerald-500 text-sm w-full sm:w-auto" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              <span className="text-slate-500 font-bold">-</span>
+              <input type="date" className="border border-slate-300 p-2 rounded outline-none focus:ring-2 focus:ring-emerald-500 text-sm w-full sm:w-auto" value={endDate} onChange={e => setEndDate(e.target.value)} />
+            </div>
+          </div>
+        )}
+
         {/* Dashboard Section */}
         {activeTab === 'dashboard' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 no-print">
@@ -126,7 +156,6 @@ export default function App() {
               const hasUnpaid = stats.unpaidCount > 0;
               const hasPaidOnly = stats.unpaidCount === 0 && stats.count > 0;
               
-              // ကတ်အရောင် သတ်မှတ်ခြင်း (အနီ၊ လိမ္မော်၊ အစိမ်း)
               const cardClass = hasUnpaid 
                 ? 'border-red-500 bg-red-50' 
                 : hasPaidOnly 
@@ -137,10 +166,8 @@ export default function App() {
                 <div key={t.id} onClick={() => setSelectedTherapist({...t, ...stats})} 
                      className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:opacity-80 relative overflow-hidden transition-colors ${cardClass}`}>
                   
-                  {/* အနီရောင် Box - ဒဏ်ကြေးရှိ (မဆောင်ရသေး) */}
                   {hasUnpaid && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးရှိ</div>}
                   
-                  {/* လိမ္မော်ရောင် Box - ဒဏ်ကြေးဆောင်ပြီး (မှတ်တမ်းရှိ) */}
                   {hasPaidOnly && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးဆောင်ပြီး</div>}
                   
                   <h3 className="font-bold text-emerald-900 text-lg">{t.name}</h3>
@@ -190,7 +217,8 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {penalties.map(p => {
+                  {/* ဒီနေရာတွင်လည်း filteredPenalties ကို ပြောင်းသုံးထားပါသည် */}
+                  {filteredPenalties.map(p => {
                     const days = getDaysOverdue(p.date);
                     const amount = calculateAmount(p);
                     const isOverdue = !p.isPaid && days > 0;
@@ -234,8 +262,8 @@ export default function App() {
                       </tr>
                     );
                   })}
-                  {penalties.length === 0 && (
-                    <tr><td colSpan={5} className="p-8 text-center text-slate-400">မှတ်တမ်း မရှိသေးပါ</td></tr>
+                  {filteredPenalties.length === 0 && (
+                    <tr><td colSpan={5} className="p-8 text-center text-slate-400">ဤရက်စွဲအတွင်း မှတ်တမ်း မရှိပါ</td></tr>
                   )}
                 </tbody>
               </table>
@@ -252,7 +280,7 @@ export default function App() {
             <h2 className="font-bold text-emerald-900 text-lg border-b pb-3 mb-4">{selectedTherapist.name} ၏ မှတ်တမ်း</h2>
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
               {selectedTherapist.list.length === 0 ? (
-                <p className="text-slate-500 text-sm text-center py-4">မှတ်တမ်းမရှိပါ။</p>
+                <p className="text-slate-500 text-sm text-center py-4">ဤရက်စွဲအတွင်း မှတ်တမ်းမရှိပါ။</p>
               ) : (
                 selectedTherapist.list.map((p: any) => {
                   const days = getDaysOverdue(p.date);
