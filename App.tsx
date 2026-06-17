@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
-import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Home, FilePlus, ClipboardList, Trash2, X } from 'lucide-react';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { 
+  Home, FilePlus, ClipboardList, Trash2, AlertCircle, 
+  PlusCircle, User, Calendar, DollarSign, Info, Share2 
+} from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA7wnYTB2uevwYl3atyTJ2EZSFc8r65eR4",
@@ -15,18 +18,31 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 const THERAPISTS = Array.from({ length: 15 }, (_, i) => ({ id: (i + 1).toString(), name: `Therapist No-${i + 1}` }));
-const CATEGORIES = ["သန့်ရှင်းရေးတာဝန် ပျက်ကွက်ခြင်း", "ခွင့်ပြုချက်မရှိဘဲ အပြင်ထွက်ခြင်း", "ဆူညံခြင်း", "ဧည့်သည်အား ဝန်ဆောင်မှုအားနည်းခြင်း", "စည်းကမ်းမဲ့ ဆေးလိပ်၊ အရက်၊ မူးယစ်ဆေးသုံးခြင်း", "မီးဖိုချောင်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အိပ်ချိန်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အခြား ဖောက်ဖျက်မှုများ"];
+const CATEGORIES = [
+  "သန့်ရှင်းရေးတာဝန် ပျက်ကွက်ခြင်း (အခန်း၊ ဘေစင်၊ အိမ်သာ စသည်)",
+  "ခွင့်ပြုချက်မရှိဘဲ အပြင်ထွက်ခြင်း / Jibble မမှတ်ခြင်း",
+  "ဆူညံခြင်း / သတ်မှတ်ချိန်ပြင်ပ ဂိမ်းကစားခြင်း",
+  "ဧည့်သည်အား ဝန်ဆောင်မှုအားနည်းခြင်း / အဆင်မပြေဖြစ်ခြင်း",
+  "စည်းကမ်းမဲ့ ဆေးလိပ်၊ အရက်၊ မူးယစ်ဆေးသုံးခြင်း",
+  "မီးဖိုချောင်စည်းကမ်း ဖောက်ဖျက်ခြင်း (စားကြွင်းစားကျန်/ပန်းကန်မဆေး)",
+  "အိပ်ချိန်စည်းကမ်း (ည ၁၂ နာရီ) ဖောက်ဖျက်ခြင်း",
+  "အခြား ဖောက်ဖျက်မှုများ"
+];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [penalties, setPenalties] = useState<any[]>([]);
+  const [isPublicMode, setIsPublicMode] = useState(false);
   const [formData, setFormData] = useState({ therapistId: '1', category: CATEGORIES[0], amount: '', remark: '', date: new Date().toISOString().split('T')[0] });
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'public') setIsPublicMode(true);
+    
     signInAnonymously(auth);
     const q = query(collection(db, 'penalties'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
@@ -41,22 +57,39 @@ export default function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(!formData.amount) return alert("ပမာဏဖြည့်ပါ");
-    await addDoc(collection(db, 'penalties'), { ...formData, therapistName: THERAPISTS.find(t=>t.id===formData.therapistId)?.name, createdAt: Date.now() });
-    setFormData({...formData, amount: '', remark: ''});
+    if (!formData.amount) return alert("ပမာဏဖြည့်ပါ");
+    await addDoc(collection(db, 'penalties'), { 
+      ...formData, 
+      amount: Number(formData.amount), 
+      therapistName: THERAPISTS.find(t => t.id === formData.therapistId)?.name, 
+      createdAt: Date.now() 
+    });
+    setFormData({ ...formData, amount: '', remark: '' });
     alert("မှတ်တမ်းတင်ပြီးပါပြီ");
   };
 
   const handleDelete = async (id: string) => {
-    if(confirm("ဖျက်ရန်သေချာပါသလား?")) await deleteDoc(doc(db, 'penalties', id));
+    if (window.confirm("ဖျက်ရန်သေချာပါသလား?")) await deleteDoc(doc(db, 'penalties', id));
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.origin + '?mode=public');
+    alert("Public Link ကို ကူးယူပြီးပါပြီ။ အခြားဖုန်းတွင် ဤလင့်ခ်ကို Paste လုပ်၍ ကြည့်ရှုပါ။");
   };
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <nav className="bg-emerald-900 text-white p-4 flex justify-between shadow-lg sticky top-0 z-50">
-        <h1 className="font-bold text-xl">THE SHANGRI-LA</h1>
-        <div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')}><Home/></button><button onClick={() => setActiveTab('add')}><FilePlus/></button><button onClick={() => setActiveTab('history')}><ClipboardList/></button></div>
-      </nav>
+      {!isPublicMode && (
+        <nav className="bg-emerald-900 text-white p-4 flex justify-between shadow-lg sticky top-0 z-50">
+          <h1 className="font-bold text-xl">THE SHANGRI-LA</h1>
+          <div className="flex gap-4">
+            <button onClick={() => setActiveTab('dashboard')}><Home /></button>
+            <button onClick={() => setActiveTab('add')}><FilePlus /></button>
+            <button onClick={() => setActiveTab('history')}><ClipboardList /></button>
+            <button onClick={copyLink}><Share2 /></button>
+          </div>
+        </nav>
+      )}
 
       <main className="p-4 max-w-4xl mx-auto">
         {activeTab === 'dashboard' && (
@@ -89,12 +122,12 @@ export default function App() {
         {activeTab === 'history' && (
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-100 uppercase"><tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">မှတ်ချက်</th><th className="p-3 text-left">ကျပ်</th><th className="p-3"></th></tr></thead>
+              <thead className="bg-slate-100 uppercase"><tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">မှတ်ချက်</th><th className="p-3 text-left">ကျပ်</th>{!isPublicMode && <th className="p-3"></th>}</tr></thead>
               <tbody>
                 {penalties.map(p => (
                   <tr key={p.id} className="border-b">
                     <td className="p-3">{p.date}</td><td className="p-3">{p.therapistName}</td><td className="p-3">{p.category}</td><td className="p-3">{p.remark}</td><td className="p-3 font-bold text-red-600">{Number(p.amount).toLocaleString()}</td>
-                    <td className="p-3 text-center"><button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button></td>
+                    {!isPublicMode && <td className="p-3 text-center"><button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button></td>}
                   </tr>
                 ))}
               </tbody>
