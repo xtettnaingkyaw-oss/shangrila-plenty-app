@@ -70,9 +70,15 @@ export default function App() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {THERAPISTS.map(t => {
               const stats = getStats(t.id);
+              const isRed = stats.total > 0;
               return (
                 <div key={t.id} onClick={() => setSelectedTherapist({...t, ...stats})} 
-                     className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:bg-emerald-50 ${stats.total > 0 ? 'border-red-500 bg-red-50' : 'border-emerald-600 bg-white'}`}>
+                     className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:bg-emerald-50 relative overflow-hidden ${isRed ? 'border-red-500 bg-red-50' : 'border-emerald-600 bg-white'}`}>
+                  {isRed && (
+                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">
+                      ဒဏ်ကြေးရှိ
+                    </div>
+                  )}
                   <h3 className="font-bold text-emerald-900 text-lg">{t.name}</h3>
                   <p className="text-sm font-bold text-emerald-800">စုစုပေါင်း: {stats.total.toLocaleString()} Ks ({stats.count} ကြိမ်)</p>
                 </div>
