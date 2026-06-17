@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, query, orderBy } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Home, FilePlus, ClipboardList, Trash2, X, Share2, Download, CheckCircle, Calendar } from 'lucide-react';
+import { Home, FilePlus, ClipboardList, Trash2, X, Share2, Download, CheckCircle, Calendar, Wallet } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA7wnYTB2uevwYl3atyTJ2EZSFc8r65eR4",
@@ -19,16 +19,18 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 const THERAPISTS = Array.from({ length: 15 }, (_, i) => ({ id: (i + 1).toString(), name: `Therapist No-${i + 1}` }));
-const CATEGORIES = ["သန့်ရှင်းရေးတာဝန် ပျက်ကွက်ခြင်း", "ခွင့်ပြုချက်မရှိဘဲ အပြင်ထွက်ခြင်း", "ဆူညံခြင်း၊ အလုပ်ချိန် ဂိမ်းဆော့ခြင်း", "ဧည့်သည်အား ဝန်ဆောင်မှုအားနည်းခြင်း", "စည်းကမ်းမဲ့ ဆေးလိပ်၊ အရက်၊ မူးယစ်ဆေးသုံးခြင်း", "မီးဖိုချောင်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အိပ်ချိန်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အခြား ဖောက်ဖျက်မှုများ"];
+const CATEGORIES = ["သန့်ရှင်းရေးတာဝန် ပျက်ကွက်ခြင်း", "ခွင့်ပြုချက်မရှိဘဲ အပြင်ထွက်ခြင်း", "ဆူညံခြင်း", "ဧည့်သည်အား ဝန်ဆောင်မှုအားနည်းခြင်း", "စည်းကမ်းမဲ့ ဆေးလိပ်၊ အရက်၊ မူးယစ်ဆေးသုံးခြင်း", "မီးဖိုချောင်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အိပ်ချိန်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အခြား ဖောက်ဖျက်မှုများ"];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [penalties, setPenalties] = useState<any[]>([]);
+  const [deposits, setDeposits] = useState<any[]>([]); // အပ်ငွေများအတွက် State အသစ်
   const [isPublic, setIsPublic] = useState(false);
   const [selectedTherapist, setSelectedTherapist] = useState<any>(null);
+  
   const [formData, setFormData] = useState({ therapistId: '1', category: CATEGORIES[0], amount: '', remark: '', date: new Date().toISOString().split('T')[0] });
+  const [depositForm, setDepositForm] = useState({ therapistId: '1', amount: '', note: '' });
 
-  // လက်ရှိလ၏ ပထမရက် နှင့် နောက်ဆုံးရက် ကို ရှာဖွေခြင်း
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
@@ -40,13 +42,18 @@ export default function App() {
   useEffect(() => {
     if (window.location.search.includes('mode=public')) setIsPublic(true);
     signInAnonymously(auth);
-    const q = query(collection(db, 'penalties'), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      setPenalties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    
+    // ဒဏ်ကြေးမှတ်တမ်းများ
+    const qPenalties = query(collection(db, 'penalties'), orderBy('createdAt', 'desc'));
+    const unsubP = onSnapshot(qPenalties, (snapshot) => setPenalties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+
+    // အပ်ငွေမှတ်တမ်းများ
+    const qDeposits = query(collection(db, 'deposits'), orderBy('createdAt', 'desc'));
+    const unsubD = onSnapshot(qDeposits, (snapshot) => setDeposits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+
+    return () => { unsubP(); unsubD(); };
   }, []);
 
-  // ရက်စွဲအလိုက် စစ်ထုတ်ထားသော Data များ (Filter)
   const filteredPenalties = penalties.filter(p => {
     const pDate = p.date;
     return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate);
@@ -69,7 +76,6 @@ export default function App() {
   };
 
   const getStats = (id: string) => {
-    // စစ်ထုတ်ထားသော filteredPenalties ကို အသုံးပြုမည်
     const p = filteredPenalties.filter(item => String(item.therapistId) === id);
     const unpaid = p.filter(item => !item.isPaid);
     const paid = p.filter(item => item.isPaid);
@@ -77,10 +83,14 @@ export default function App() {
     const totalUnpaid = unpaid.reduce((sum, item) => sum + calculateAmount(item), 0);
     const totalPaid = paid.reduce((sum, item) => sum + calculateAmount(item), 0);
     
-    return { count: p.length, unpaidCount: unpaid.length, totalUnpaid, totalPaid, list: p };
+    // အပ်ငွေလက်ကျန် (Running Balance - ရက်စွဲမရွေး တွက်မည်)
+    const d = deposits.filter(item => String(item.therapistId) === id);
+    const depositBalance = d.reduce((sum, item) => sum + Number(item.amount), 0);
+
+    return { count: p.length, unpaidCount: unpaid.length, totalUnpaid, totalPaid, depositBalance, list: p };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitPenalty = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!formData.amount) return alert("ပမာဏဖြည့်ပါ");
     await addDoc(collection(db, 'penalties'), { 
@@ -91,24 +101,71 @@ export default function App() {
       createdAt: Date.now() 
     });
     setFormData({...formData, amount: '', remark: ''});
-    alert("မှတ်တမ်းတင်ပြီးပါပြီ");
+    alert("ဒဏ်ကြေး မှတ်တမ်းတင်ပြီးပါပြီ");
     setActiveTab('dashboard');
   };
 
-  const handleMarkAsPaid = async (p: any) => {
+  const handleSubmitDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!depositForm.amount) return alert("ပမာဏဖြည့်ပါ");
+    await addDoc(collection(db, 'deposits'), {
+      therapistId: depositForm.therapistId,
+      amount: Number(depositForm.amount), // အပေါင်းကိန်း (အပ်ငွေသွင်းခြင်း)
+      date: new Date().toISOString().split('T')[0],
+      type: 'deposit',
+      note: depositForm.note || 'အပ်ငွေသွင်းခြင်း',
+      createdAt: Date.now()
+    });
+    setDepositForm({...depositForm, amount: '', note: ''});
+    alert("အပ်ငွေ မှတ်တမ်းတင်ပြီးပါပြီ");
+  };
+
+  const handleMarkAsPaid = async (p: any, method: 'cash' | 'deposit') => {
     const currentAmt = calculateAmount(p);
-    if(window.confirm(`ပေးဆောင်ရမည့် ဒဏ်ကြေးပမာဏမှာ ${currentAmt.toLocaleString()} Ks ဖြစ်ပါသည်။\nငွေရှင်းပြီးကြောင်း မှတ်သားမည်လား?`)) {
-      await updateDoc(doc(db, 'penalties', p.id), {
-        isPaid: true,
-        finalAmount: currentAmt,
-        paidDate: new Date().toISOString().split('T')[0]
-      });
+    
+    if (method === 'deposit') {
+      // အပ်ငွေမှနှုတ်မည်ဆိုလျှင် လက်ကျန်စစ်ဆေးခြင်း
+      const d = deposits.filter(item => String(item.therapistId) === String(p.therapistId));
+      const depositBalance = d.reduce((sum, item) => sum + Number(item.amount), 0);
+      
+      if (depositBalance < currentAmt) {
+        alert(`အပ်ငွေလက်ကျန် (${depositBalance.toLocaleString()} Ks) မလုံလောက်ပါ။ လက်ငင်းသာ ပေးဆောင်နိုင်ပါမည်။`);
+        return;
+      }
+      
+      if(window.confirm(`အပ်ငွေထဲမှ ${currentAmt.toLocaleString()} Ks နှုတ်မည်မှာ သေချာပါသလား?`)) {
+        // အပ်ငွေထဲမှ အနှုတ်ကိန်းဖြင့် မှတ်တမ်းထည့်ခြင်း
+        await addDoc(collection(db, 'deposits'), {
+          therapistId: p.therapistId,
+          amount: -currentAmt,
+          date: new Date().toISOString().split('T')[0],
+          type: 'deduction',
+          note: `${p.date} ရက်စွဲပါ ဒဏ်ကြေး ဖြတ်တောက်ခြင်း`,
+          createdAt: Date.now()
+        });
+        
+        // ဒဏ်ကြေးကို ပေးဆောင်ပြီးအဖြစ် ပြောင်းလဲခြင်း
+        await updateDoc(doc(db, 'penalties', p.id), {
+          isPaid: true,
+          paidMethod: 'deposit',
+          finalAmount: currentAmt,
+          paidDate: new Date().toISOString().split('T')[0]
+        });
+      }
+    } else {
+      // လက်ငင်း ငွေရှင်းခြင်း
+      if(window.confirm(`လက်ငင်းငွေ ${currentAmt.toLocaleString()} Ks ပေးဆောင်မည်မှာ သေချာပါသလား?`)) {
+        await updateDoc(doc(db, 'penalties', p.id), {
+          isPaid: true,
+          paidMethod: 'cash',
+          finalAmount: currentAmt,
+          paidDate: new Date().toISOString().split('T')[0]
+        });
+      }
     }
   };
 
-  const handlePrintPDF = () => {
-    window.print();
-  };
+  const handlePrintPDF = () => window.print();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -127,6 +184,7 @@ export default function App() {
             <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-amber-400' : ''}><Home/></button>
             <button onClick={() => setActiveTab('add')} className={activeTab === 'add' ? 'text-amber-400' : ''}><FilePlus/></button>
             <button onClick={() => setActiveTab('history')} className={activeTab === 'history' ? 'text-amber-400' : ''}><ClipboardList/></button>
+            <button onClick={() => setActiveTab('deposits')} className={activeTab === 'deposits' ? 'text-amber-400' : ''}><Wallet/></button>
             <button onClick={() => {navigator.clipboard.writeText(window.location.origin + '?mode=public'); alert("Link ကူးယူပြီးပါပြီ")}}><Share2/></button>
           </div>
         )}
@@ -134,12 +192,10 @@ export default function App() {
 
       <main className="p-4 max-w-4xl mx-auto print-section">
         
-        {/* Date Filter Bar (Dashboard နှင့် History အတွက်သာ) */}
+        {/* Date Filter Bar */}
         {(activeTab === 'dashboard' || activeTab === 'history') && (
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4 flex flex-col sm:flex-row gap-4 items-center justify-between no-print">
-            <h2 className="font-bold text-emerald-900 flex items-center gap-2">
-              <Calendar size={20} /> ရက်စွဲအလိုက် ကြည့်ရန်
-            </h2>
+            <h2 className="font-bold text-emerald-900 flex items-center gap-2"><Calendar size={20} /> ရက်စွဲအလိုက် ကြည့်ရန်</h2>
             <div className="flex gap-2 items-center w-full sm:w-auto">
               <input type="date" className="border border-slate-300 p-2 rounded outline-none focus:ring-2 focus:ring-emerald-500 text-sm w-full sm:w-auto" value={startDate} onChange={e => setStartDate(e.target.value)} />
               <span className="text-slate-500 font-bold">-</span>
@@ -167,12 +223,15 @@ export default function App() {
                      className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:opacity-80 relative overflow-hidden transition-colors ${cardClass}`}>
                   
                   {hasUnpaid && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးရှိ</div>}
-                  
                   {hasPaidOnly && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးဆောင်ပြီး</div>}
                   
-                  <h3 className="font-bold text-emerald-900 text-lg">{t.name}</h3>
+                  <h3 className="font-bold text-emerald-900 text-lg flex justify-between">
+                    {t.name}
+                    {/* အပ်ငွေရှိလျှင် အပြာရောင်ဖြင့် ပြမည် */}
+                    {stats.depositBalance > 0 && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold self-center">အပ်ငွေ: {stats.depositBalance.toLocaleString()} Ks</span>}
+                  </h3>
                   
-                  <div className="mt-1 space-y-0.5">
+                  <div className="mt-2 space-y-0.5">
                     {stats.totalUnpaid > 0 && <p className="text-sm font-bold text-red-600">မဆောင်ရသေး: {stats.totalUnpaid.toLocaleString()} Ks ({stats.unpaidCount} ခု)</p>}
                     {stats.totalPaid > 0 && <p className="text-sm font-bold text-emerald-800">ပေးဆောင်ပြီး: {stats.totalPaid.toLocaleString()} Ks</p>}
                     {stats.count === 0 && <p className="text-sm font-bold text-emerald-700 mt-2 opacity-70">ဒဏ်ကြေးမှတ်တမ်းမရှိပါ</p>}
@@ -183,9 +242,9 @@ export default function App() {
           </div>
         )}
 
-        {/* Add Form Section */}
+        {/* Add Penalty Section */}
         {activeTab === 'add' && !isPublic && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow space-y-4 no-print">
+          <form onSubmit={handleSubmitPenalty} className="bg-white p-6 rounded-xl shadow space-y-4 no-print">
             <h2 className="font-bold text-emerald-900 text-lg">ဒဏ်ကြေးအသစ် မှတ်တမ်းတင်ရန်</h2>
             <select className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" onChange={e => setFormData({...formData, therapistId: e.target.value})}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
             <input type="date" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required/>
@@ -194,6 +253,45 @@ export default function App() {
             <textarea placeholder="မှတ်ချက်" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" value={formData.remark} onChange={e => setFormData({...formData, remark: e.target.value})} />
             <button className="w-full bg-emerald-900 hover:bg-emerald-800 transition-colors text-white p-3 rounded font-bold">မှတ်တမ်းတင်မည်</button>
           </form>
+        )}
+
+        {/* Manage Deposits Section (Tab အသစ်) */}
+        {activeTab === 'deposits' && !isPublic && (
+          <div className="space-y-6 no-print">
+            <form onSubmit={handleSubmitDeposit} className="bg-white p-6 rounded-xl shadow space-y-4">
+              <h2 className="font-bold text-blue-900 text-lg flex items-center gap-2"><Wallet/> အပ်ငွေသွင်းရန်</h2>
+              <select className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-blue-500" onChange={e => setDepositForm({...depositForm, therapistId: e.target.value})} value={depositForm.therapistId}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+              <input type="number" placeholder="အပ်ငွေပမာဏ (ကျပ်)" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-blue-500" value={depositForm.amount} onChange={e => setDepositForm({...depositForm, amount: e.target.value})} required min="0"/>
+              <input type="text" placeholder="မှတ်ချက် (ဥပမာ- ကြိုတင်အပ်ငွေ)" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-blue-500" value={depositForm.note} onChange={e => setDepositForm({...depositForm, note: e.target.value})} />
+              <button className="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white p-3 rounded font-bold">အပ်ငွေ စာရင်းသွင်းမည်</button>
+            </form>
+
+            <div className="bg-white rounded-xl shadow overflow-hidden border border-slate-200">
+              <h3 className="p-4 bg-slate-50 font-bold text-slate-700 border-b">အပ်ငွေ / အနှုတ် မှတ်တမ်းများ</h3>
+              <table className="w-full text-sm">
+                <tbody>
+                  {deposits.map(d => (
+                    <tr key={d.id} className="border-b hover:bg-slate-50">
+                      <td className="p-3">
+                        <span className="font-bold">{d.date}</span><br/>
+                        <span className="text-emerald-900 font-bold text-xs">{THERAPISTS.find(t=>t.id===d.therapistId)?.name}</span>
+                      </td>
+                      <td className="p-3 text-slate-600">{d.note}</td>
+                      <td className={`p-3 text-right font-bold ${d.amount > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {d.amount > 0 ? '+' : ''}{Number(d.amount).toLocaleString()} Ks
+                      </td>
+                      <td className="p-3 text-center">
+                        <button onClick={() => {if(window.confirm('ဖျက်ရန်သေချာပါသလား?')) deleteDoc(doc(db, 'deposits', d.id));}} className="text-slate-400 hover:text-red-600 p-1">
+                          <Trash2 size={16}/>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {deposits.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-slate-400">မှတ်တမ်းမရှိသေးပါ</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* History Table Section */}
@@ -217,7 +315,6 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {/* ဒီနေရာတွင်လည်း filteredPenalties ကို ပြောင်းသုံးထားပါသည် */}
                   {filteredPenalties.map(p => {
                     const days = getDaysOverdue(p.date);
                     const amount = calculateAmount(p);
@@ -229,7 +326,9 @@ export default function App() {
                           <div className="font-bold">{p.date}</div>
                           <div className="mt-1">
                             {p.isPaid ? (
-                              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">ပေးပြီး</span>
+                              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                {p.paidMethod === 'deposit' ? 'အပ်ငွေမှ နှုတ်ပြီး' : 'ပေးပြီး'}
+                              </span>
                             ) : (
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                                 {isOverdue ? `လွန်နေသည် (${days} ရက်)` : 'ယနေ့ဆောင်ရန်'}
@@ -247,13 +346,18 @@ export default function App() {
                         </td>
                         {!isPublic && (
                           <td className="p-4 text-center no-print">
-                            <div className="flex justify-center gap-3">
+                            <div className="flex justify-center gap-2">
                               {!p.isPaid && (
-                                <button onClick={() => handleMarkAsPaid(p)} className="text-emerald-500 hover:text-emerald-700 bg-emerald-50 p-1.5 rounded-full" title="ပေးဆောင်ပြီးဖြစ်ကြောင်း မှတ်မည်">
-                                  <CheckCircle size={18}/>
-                                </button>
+                                <>
+                                  <button onClick={() => handleMarkAsPaid(p, 'cash')} className="text-emerald-500 hover:text-emerald-700 bg-emerald-50 p-1.5 rounded-full" title="လက်ငင်းငွေ ပေးမည်">
+                                    <CheckCircle size={18}/>
+                                  </button>
+                                  <button onClick={() => handleMarkAsPaid(p, 'deposit')} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-1.5 rounded-full" title="အပ်ငွေထဲမှ နှုတ်မည်">
+                                    <Wallet size={18}/>
+                                  </button>
+                                </>
                               )}
-                              <button onClick={() => {if(window.confirm('ဖျက်ရန်သေချာပါသလား?')) deleteDoc(doc(db, 'penalties', p.id));}} className="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-full" title="ဖျက်ရန်">
+                              <button onClick={() => {if(window.confirm('ဖျက်ရန်သေချာပါသလား?')) deleteDoc(doc(db, 'penalties', p.id));}} className="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-full ml-1" title="ဖျက်ရန်">
                                 <Trash2 size={18}/>
                               </button>
                             </div>
@@ -277,7 +381,10 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center p-4 z-50 no-print">
           <div className="bg-white w-full max-w-sm rounded-xl p-6 relative shadow-2xl">
             <button onClick={() => setSelectedTherapist(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full"><X size={20}/></button>
-            <h2 className="font-bold text-emerald-900 text-lg border-b pb-3 mb-4">{selectedTherapist.name} ၏ မှတ်တမ်း</h2>
+            <h2 className="font-bold text-emerald-900 text-lg border-b pb-3 mb-4 flex justify-between">
+              {selectedTherapist.name}
+              {selectedTherapist.depositBalance > 0 && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">အပ်ငွေ: {selectedTherapist.depositBalance.toLocaleString()}</span>}
+            </h2>
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
               {selectedTherapist.list.length === 0 ? (
                 <p className="text-slate-500 text-sm text-center py-4">ဤရက်စွဲအတွင်း မှတ်တမ်းမရှိပါ။</p>
@@ -295,7 +402,7 @@ export default function App() {
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-xs font-bold text-slate-500">
                           {p.isPaid ? (
-                             <span className="text-emerald-700">✓ ပေးဆောင်ပြီး ({p.paidDate})</span>
+                             <span className="text-emerald-700">✓ {p.paidMethod === 'deposit' ? 'အပ်ငွေမှနှုတ်ပြီး' : 'ပေးဆောင်ပြီး'} ({p.paidDate})</span>
                           ) : (
                              <span className={days > 0 ? 'text-red-600' : 'text-amber-600'}>
                                {days > 0 ? `! ရက်လွန်နေသည် (${days} ရက်)` : '• ယနေ့ဆောင်ရန်'}
