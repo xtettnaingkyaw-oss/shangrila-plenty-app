@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Home, FilePlus, ClipboardList, Trash2, User, X } from 'lucide-react';
+import { Home, FilePlus, ClipboardList, Trash2, User, X, Info, Calendar, DollarSign, AlertCircle, PlusCircle } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA7wnYTB2uevwYl3atyTJ2EZSFc8r65eR4",
@@ -19,16 +19,11 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 const THERAPISTS = Array.from({ length: 15 }, (_, i) => ({ id: (i + 1).toString(), name: `Therapist No-${i + 1}` }));
-const CATEGORIES = [
-  "သန့်ရှင်းရေးတာဝန် ပျက်ကွက်ခြင်း", "ခွင့်ပြုချက်မရှိဘဲ အပြင်ထွက်ခြင်း", "ဆူညံခြင်း", 
-  "ဧည့်သည်အား ဝန်ဆောင်မှုအားနည်းခြင်း", "စည်းကမ်းမဲ့ ဆေးလိပ်၊ အရက်၊ မူးယစ်ဆေးသုံးခြင်း", 
-  "မီးဖိုချောင်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အိပ်ချိန်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အခြား ဖောက်ဖျက်မှုများ"
-];
+const CATEGORIES = ["သန့်ရှင်းရေးတာဝန် ပျက်ကွက်ခြင်း", "ခွင့်ပြုချက်မရှိဘဲ အပြင်ထွက်ခြင်း", "ဆူညံခြင်း", "ဧည့်သည်အား ဝန်ဆောင်မှုအားနည်းခြင်း", "စည်းကမ်းမဲ့ ဆေးလိပ်၊ အရက်၊ မူးယစ်ဆေးသုံးခြင်း", "မီးဖိုချောင်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အိပ်ချိန်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အခြား ဖောက်ဖျက်မှုများ"];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [penalties, setPenalties] = useState<any[]>([]);
-  const [selectedTherapist, setSelectedTherapist] = useState<any>(null);
   const [formData, setFormData] = useState({ therapistId: '1', category: CATEGORIES[0], amount: '', remark: '', date: new Date().toISOString().split('T')[0] });
 
   useEffect(() => {
@@ -41,15 +36,19 @@ export default function App() {
 
   const getStats = (id: string) => {
     const p = penalties.filter(item => item.therapistId === id);
-    return { count: p.length, total: p.reduce((sum, item) => sum + Number(item.amount), 0), list: p };
+    return { count: p.length, total: p.reduce((sum, item) => sum + Number(item.amount), 0) };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!formData.amount) return alert("ပမာဏဖြည့်ပါ");
-    await addDoc(collection(db, 'penalties'), { ...formData, amount: Number(formData.amount), createdAt: Date.now() });
+    await addDoc(collection(db, 'penalties'), { ...formData, amount: Number(formData.amount), therapistName: THERAPISTS.find(t=>t.id===formData.therapistId)?.name, createdAt: Date.now() });
     setFormData({...formData, amount: '', remark: ''});
     alert("မှတ်တမ်းတင်ပြီးပါပြီ");
+  };
+
+  const handleDelete = async (id: string) => {
+    if(confirm("ဖျက်ရန်သေချာပါသလား?")) await deleteDoc(doc(db, 'penalties', id));
   };
 
   return (
@@ -70,13 +69,9 @@ export default function App() {
               const stats = getStats(t.id);
               const isRed = stats.total > 0;
               return (
-                <div key={t.id} onClick={() => setSelectedTherapist({...t, ...stats})} 
-                     className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:opacity-80 ${isRed ? 'border-red-500 bg-red-50' : 'border-emerald-600 bg-white'}`}>
+                <div key={t.id} className={`p-4 rounded-xl shadow border-l-8 ${isRed ? 'border-red-500 bg-red-50' : 'border-emerald-600 bg-white'}`}>
                   <h3 className="font-bold text-lg">{t.name}</h3>
-                  <p className={`text-sm font-semibold ${isRed ? 'text-red-700' : 'text-slate-600'}`}>
-                    စုစုပေါင်း: {stats.total.toLocaleString()} Ks ({stats.count} ကြိမ်)
-                  </p>
-                  {isRed && <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded font-bold">ဒဏ်ကြေးရှိ</span>}
+                  <p className="text-sm font-semibold text-slate-700">စုစုပေါင်း: {stats.total.toLocaleString()} Ks ({stats.count} ကြိမ်)</p>
                 </div>
               );
             })}
@@ -85,36 +80,33 @@ export default function App() {
 
         {activeTab === 'add' && (
           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow space-y-4">
-            <h2 className="font-bold text-lg">ဒဏ်ကြေးမှတ်တမ်းအသစ်</h2>
-            <select className="w-full p-2 border rounded" onChange={e => setFormData({...formData, therapistId: e.target.value})}>
-              {THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <select className="w-full p-2 border rounded" onChange={e => setFormData({...formData, category: e.target.value})}>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input type="number" placeholder="ပမာဏ (ကျပ်)" className="w-full p-2 border rounded" onChange={e => setFormData({...formData, amount: e.target.value})} />
-            <button className="w-full bg-emerald-900 text-white p-2 rounded">မှတ်တမ်းတင်မည်</button>
+            <h2 className="font-bold text-lg">ဒဏ်ကြေးအသစ် မှတ်တမ်းတင်ရန်</h2>
+            <select className="w-full p-3 border rounded" onChange={e => setFormData({...formData, therapistId: e.target.value})}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <select className="w-full p-3 border rounded" onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+            <input type="number" placeholder="ပမာဏ (ကျပ်)" className="w-full p-3 border rounded" onChange={e => setFormData({...formData, amount: e.target.value})} />
+            <textarea placeholder="မှတ်ချက်" className="w-full p-3 border rounded" onChange={e => setFormData({...formData, remark: e.target.value})} />
+            <button className="w-full bg-emerald-900 text-white p-3 rounded font-bold">မှတ်တမ်းတင်မည်</button>
           </form>
         )}
-      </main>
 
-      {selectedTherapist && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-sm rounded-xl p-6 relative">
-            <button onClick={() => setSelectedTherapist(null)} className="absolute top-2 right-2"><X /></button>
-            <h2 className="text-lg font-bold mb-4">{selectedTherapist.name} ၏ မှတ်တမ်း</h2>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {selectedTherapist.list.map((p: any) => (
-                <div key={p.id} className="border-b pb-2 text-sm">
-                  <p className="text-slate-500">{p.date}</p>
-                  <p>{p.category}</p>
-                  <p className="font-bold text-red-600">{Number(p.amount).toLocaleString()} Ks</p>
-                </div>
-              ))}
-            </div>
+        {activeTab === 'history' && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 uppercase">
+                <tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">ကျပ်</th><th className="p-3"></th></tr>
+              </thead>
+              <tbody>
+                {penalties.map(p => (
+                  <tr key={p.id} className="border-b">
+                    <td className="p-3">{p.date}</td><td className="p-3">{p.therapistName}</td><td className="p-3">{p.category}</td><td className="p-3 font-bold text-red-600">{Number(p.amount).toLocaleString()}</td>
+                    <td className="p-3 text-center"><button onClick={() => handleDelete(p.id)} className="text-red-500"><Trash2 size={16}/></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }
