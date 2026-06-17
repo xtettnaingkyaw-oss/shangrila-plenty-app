@@ -47,6 +47,10 @@ export default function App() {
     alert("မှတ်တမ်းတင်ပြီးပါပြီ");
   };
 
+  const handleDelete = async (id: string) => {
+    if(confirm("ဖျက်ရန်သေချာပါသလား?")) await deleteDoc(doc(db, 'penalties', id));
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <nav className="bg-emerald-900 text-white p-4 flex justify-between shadow-lg sticky top-0 z-50">
@@ -85,11 +89,12 @@ export default function App() {
         {activeTab === 'history' && (
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-100 uppercase"><tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">မှတ်ချက်</th><th className="p-3 text-left">ကျပ်</th></tr></thead>
+              <thead className="bg-slate-100 uppercase"><tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">မှတ်ချက်</th><th className="p-3 text-left">ကျပ်</th><th className="p-3"></th></tr></thead>
               <tbody>
                 {penalties.map(p => (
                   <tr key={p.id} className="border-b">
                     <td className="p-3">{p.date}</td><td className="p-3">{p.therapistName}</td><td className="p-3">{p.category}</td><td className="p-3">{p.remark}</td><td className="p-3 font-bold text-red-600">{Number(p.amount).toLocaleString()}</td>
+                    <td className="p-3 text-center"><button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button></td>
                   </tr>
                 ))}
               </tbody>
