@@ -211,14 +211,17 @@ export default function App() {
 
               return (
                 <div key={t.id} onClick={() => setSelectedTherapist({...t, ...stats})} 
-                     className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:opacity-80 relative overflow-hidden transition-colors ${cardClass}`}>
+                     className={`p-4 pt-6 rounded-xl shadow border-l-8 cursor-pointer hover:opacity-80 relative overflow-hidden transition-colors ${cardClass}`}>
                   
+                  {/* အပ်ငွေ Box ကို ဘယ်ဘက် အပေါ်ထောင့်သို့ ရွှေ့လိုက်ပါပြီ */}
+                  {stats.depositBalance > 0 && <div className="absolute top-0 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-br-lg font-bold shadow">အပ်ငွေ: {stats.depositBalance.toLocaleString()} Ks</div>}
+
+                  {/* ဒဏ်ကြေးရှိ/မရှိ Box များ (ညာဘက် အပေါ်ထောင့်) */}
                   {hasUnpaid && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးရှိ</div>}
                   {hasPaidOnly && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးဆောင်ပြီး</div>}
                   
-                  <h3 className="font-bold text-emerald-900 text-lg flex justify-between">
+                  <h3 className="font-bold text-emerald-900 text-lg mt-1">
                     {t.name}
-                    {stats.depositBalance > 0 && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold self-center">အပ်ငွေ: {stats.depositBalance.toLocaleString()} Ks</span>}
                   </h3>
                   
                   <div className="mt-2 space-y-0.5">
@@ -387,7 +390,6 @@ export default function App() {
                       </div>
                       <p className="text-slate-700 text-sm">{p.category}</p>
                       
-                      {/* အသစ်ပြင်ထားသော အနီရောင် Bold မှတ်ချက်အပိုင်း */}
                       {p.remark && <p className="text-red-600 font-bold text-xs mt-1">- {p.remark}</p>}
                       
                       <div className="flex justify-between items-center mt-1 border-t border-slate-200 pt-2">
