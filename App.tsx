@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Home, FilePlus, ClipboardList, Trash2, User, X, Info, Calendar, DollarSign, AlertCircle, PlusCircle } from 'lucide-react';
+import { Home, FilePlus, ClipboardList, Trash2, X } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA7wnYTB2uevwYl3atyTJ2EZSFc8r65eR4",
@@ -42,24 +42,16 @@ export default function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!formData.amount) return alert("ပမာဏဖြည့်ပါ");
-    await addDoc(collection(db, 'penalties'), { ...formData, amount: Number(formData.amount), therapistName: THERAPISTS.find(t=>t.id===formData.therapistId)?.name, createdAt: Date.now() });
+    await addDoc(collection(db, 'penalties'), { ...formData, therapistName: THERAPISTS.find(t=>t.id===formData.therapistId)?.name, createdAt: Date.now() });
     setFormData({...formData, amount: '', remark: ''});
     alert("မှတ်တမ်းတင်ပြီးပါပြီ");
   };
 
-  const handleDelete = async (id: string) => {
-    if(confirm("ဖျက်ရန်သေချာပါသလား?")) await deleteDoc(doc(db, 'penalties', id));
-  };
-
   return (
     <div className="min-h-screen bg-slate-50">
-      <nav className="bg-emerald-900 text-white p-4 flex justify-between items-center shadow-lg sticky top-0 z-50">
+      <nav className="bg-emerald-900 text-white p-4 flex justify-between shadow-lg sticky top-0 z-50">
         <h1 className="font-bold text-xl">THE SHANGRI-LA</h1>
-        <div className="flex gap-4">
-          <button onClick={() => setActiveTab('dashboard')}><Home /></button>
-          <button onClick={() => setActiveTab('add')}><FilePlus /></button>
-          <button onClick={() => setActiveTab('history')}><ClipboardList /></button>
-        </div>
+        <div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')}><Home/></button><button onClick={() => setActiveTab('add')}><FilePlus/></button><button onClick={() => setActiveTab('history')}><ClipboardList/></button></div>
       </nav>
 
       <main className="p-4 max-w-4xl mx-auto">
@@ -70,7 +62,7 @@ export default function App() {
               const isRed = stats.total > 0;
               return (
                 <div key={t.id} className={`p-4 rounded-xl shadow border-l-8 ${isRed ? 'border-red-500 bg-red-50' : 'border-emerald-600 bg-white'}`}>
-                  <h3 className="font-bold text-lg">{t.name}</h3>
+                  <h3 className="font-bold">{t.name}</h3>
                   <p className="text-sm font-semibold text-slate-700">စုစုပေါင်း: {stats.total.toLocaleString()} Ks ({stats.count} ကြိမ်)</p>
                 </div>
               );
@@ -82,9 +74,10 @@ export default function App() {
           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow space-y-4">
             <h2 className="font-bold text-lg">ဒဏ်ကြေးအသစ် မှတ်တမ်းတင်ရန်</h2>
             <select className="w-full p-3 border rounded" onChange={e => setFormData({...formData, therapistId: e.target.value})}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <input type="date" className="w-full p-3 border rounded" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
             <select className="w-full p-3 border rounded" onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-            <input type="number" placeholder="ပမာဏ (ကျပ်)" className="w-full p-3 border rounded" onChange={e => setFormData({...formData, amount: e.target.value})} />
-            <textarea placeholder="မှတ်ချက်" className="w-full p-3 border rounded" onChange={e => setFormData({...formData, remark: e.target.value})} />
+            <input type="number" placeholder="ပမာဏ (ကျပ်)" className="w-full p-3 border rounded" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+            <textarea placeholder="မှတ်ချက်" className="w-full p-3 border rounded" value={formData.remark} onChange={e => setFormData({...formData, remark: e.target.value})} />
             <button className="w-full bg-emerald-900 text-white p-3 rounded font-bold">မှတ်တမ်းတင်မည်</button>
           </form>
         )}
@@ -92,14 +85,11 @@ export default function App() {
         {activeTab === 'history' && (
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-100 uppercase">
-                <tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">ကျပ်</th><th className="p-3"></th></tr>
-              </thead>
+              <thead className="bg-slate-100 uppercase"><tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">မှတ်ချက်</th><th className="p-3 text-left">ကျပ်</th></tr></thead>
               <tbody>
                 {penalties.map(p => (
                   <tr key={p.id} className="border-b">
-                    <td className="p-3">{p.date}</td><td className="p-3">{p.therapistName}</td><td className="p-3">{p.category}</td><td className="p-3 font-bold text-red-600">{Number(p.amount).toLocaleString()}</td>
-                    <td className="p-3 text-center"><button onClick={() => handleDelete(p.id)} className="text-red-500"><Trash2 size={16}/></button></td>
+                    <td className="p-3">{p.date}</td><td className="p-3">{p.therapistName}</td><td className="p-3">{p.category}</td><td className="p-3">{p.remark}</td><td className="p-3 font-bold text-red-600">{Number(p.amount).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
