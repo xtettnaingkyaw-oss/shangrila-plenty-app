@@ -326,7 +326,7 @@ export default function App() {
                         <td className="p-4 font-bold text-emerald-900">{p.therapistName}</td>
                         <td className="p-4">
                           <p>{p.category}</p>
-                          {p.remark && <p className="text-slate-500 text-xs mt-0.5">{p.remark}</p>}
+                          {p.remark && <p className="text-red-600 font-bold text-xs mt-1">- {p.remark}</p>}
                         </td>
                         <td className={`p-4 text-right font-bold ${p.isPaid ? 'text-emerald-600' : 'text-red-600'}`}>
                           {amount.toLocaleString()} Ks
@@ -387,8 +387,8 @@ export default function App() {
                       </div>
                       <p className="text-slate-700 text-sm">{p.category}</p>
                       
-                      {/* အသစ်ထည့်ထားသော မှတ်ချက်အပိုင်း */}
-                      {p.remark && <p className="text-slate-600 text-xs italic mt-1">- {p.remark}</p>}
+                      {/* အသစ်ပြင်ထားသော အနီရောင် Bold မှတ်ချက်အပိုင်း */}
+                      {p.remark && <p className="text-red-600 font-bold text-xs mt-1">- {p.remark}</p>}
                       
                       <div className="flex justify-between items-center mt-1 border-t border-slate-200 pt-2">
                         <span className="text-xs font-bold text-slate-500">
