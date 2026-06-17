@@ -7,14 +7,14 @@ import {
   PlusCircle, User, Calendar, DollarSign, Info, Share2 
 } from 'lucide-react';
 
-// Firebase Config ယာယီ
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyA7wnYTB2uevwYl3atyTJ2EZSFc8r65eR4",
+  authDomain: "shangrila-app-eff40.firebaseapp.com",
+  projectId: "shangrila-app-eff40",
+  storageBucket: "shangrila-app-eff40.firebasestorage.app",
+  messagingSenderId: "608642199100",
+  appId: "1:608642199100:web:9d59a6f41903f12a779d39",
+  measurementId: "G-YWGGEEDM2F"
 };
 
 let app: any, auth: any, db: any;
