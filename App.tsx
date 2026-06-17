@@ -250,15 +250,6 @@ export default function App() {
               </div>
             </div>
 
-            {!isFirebaseEnabled && !isPublicMode && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg flex items-start gap-3">
-                <AlertCircle className="flex-shrink-0 mt-0.5" size={20} />
-                <p className="text-sm">
-                  <strong>သတိပြုရန်:</strong> လက်ရှိတွင် Database မချိတ်ဆက်ရသေးသဖြင့် အခြားဖုန်းများမှ ဝင်ကြည့်ပါက ဒေတာများ မြင်ရမည်မဟုတ်ပါ။ တကယ့်အပြင်တွင် သုံးရန် Firebase Config ထည့်သွင်းရန် လိုအပ်ပါသည်။
-                </p>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {getTherapistStats().map((t) => (
                 <div key={t.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 relative overflow-hidden">
