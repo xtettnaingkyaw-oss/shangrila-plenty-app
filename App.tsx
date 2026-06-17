@@ -42,19 +42,28 @@ export default function App() {
     return { count: p.length, total: p.reduce((sum, item) => sum + Number(item.amount), 0), list: p };
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!formData.amount) return alert("ပမာဏဖြည့်ပါ");
+    await addDoc(collection(db, 'penalties'), { ...formData, therapistName: THERAPISTS.find(t=>t.id===formData.therapistId)?.name, createdAt: Date.now() });
+    setFormData({...formData, amount: '', remark: ''});
+    alert("မှတ်တမ်းတင်ပြီးပါပြီ");
+    setActiveTab('dashboard');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
-      {!isPublic && (
-        <nav className="bg-emerald-900 text-white p-4 flex justify-between shadow-lg sticky top-0 z-50">
-          <h1 className="font-bold text-xl">THE SHANGRI-LA</h1>
+      <nav className="bg-emerald-900 text-white p-4 flex justify-between shadow-lg sticky top-0 z-50">
+        <h1 className="font-bold text-xl">THE SHANGRI-LA</h1>
+        {!isPublic && (
           <div className="flex gap-4">
             <button onClick={() => setActiveTab('dashboard')}><Home/></button>
             <button onClick={() => setActiveTab('add')}><FilePlus/></button>
             <button onClick={() => setActiveTab('history')}><ClipboardList/></button>
             <button onClick={() => {navigator.clipboard.writeText(window.location.origin + '?mode=public'); alert("Link ကူးယူပြီးပါပြီ")}}><Share2/></button>
           </div>
-        </nav>
-      )}
+        )}
+      </nav>
 
       <main className="p-4 max-w-4xl mx-auto">
         {activeTab === 'dashboard' && (
@@ -72,7 +81,33 @@ export default function App() {
           </div>
         )}
 
-        {/* ... (add form and history table remain similar, but ensure headers have 'font-bold text-emerald-900' class) */}
+        {activeTab === 'add' && (
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow space-y-4">
+            <h2 className="font-bold text-emerald-900 text-lg">ဒဏ်ကြေးအသစ် မှတ်တမ်းတင်ရန်</h2>
+            <select className="w-full p-3 border rounded" onChange={e => setFormData({...formData, therapistId: e.target.value})}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <input type="date" className="w-full p-3 border rounded" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+            <select className="w-full p-3 border rounded" onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+            <input type="number" placeholder="ပမာဏ (ကျပ်)" className="w-full p-3 border rounded" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+            <textarea placeholder="မှတ်ချက်" className="w-full p-3 border rounded" value={formData.remark} onChange={e => setFormData({...formData, remark: e.target.value})} />
+            <button className="w-full bg-emerald-900 text-white p-3 rounded font-bold">မှတ်တမ်းတင်မည်</button>
+          </form>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 uppercase font-bold text-emerald-900"><tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">မှတ်ချက်</th><th className="p-3 text-left">ကျပ်</th>{!isPublic && <th className="p-3"></th>}</tr></thead>
+              <tbody>
+                {penalties.map(p => (
+                  <tr key={p.id} className="border-b">
+                    <td className="p-3">{p.date}</td><td className="p-3">{p.therapistName}</td><td className="p-3">{p.category}</td><td className="p-3">{p.remark}</td><td className="p-3 font-bold text-red-600">{Number(p.amount).toLocaleString()}</td>
+                    {!isPublic && <td className="p-3 text-center"><button onClick={() => deleteDoc(doc(db, 'penalties', p.id))} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button></td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </main>
 
       {selectedTherapist && (
