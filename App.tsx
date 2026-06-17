@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Home, FilePlus, ClipboardList, Trash2, X, Share2 } from 'lucide-react';
+import { Home, FilePlus, ClipboardList, Trash2, X, Share2, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA7wnYTB2uevwYl3atyTJ2EZSFc8r65eR4",
@@ -37,6 +39,16 @@ export default function App() {
     });
   }, []);
 
+  const generatePDF = () => {
+    const doc = new jsPDF();
+    doc.text("Shangri-La Penalty Report", 14, 15);
+    (doc as any).autoTable({
+      head: [['ရက်စွဲ', 'ဝန်ထမ်း', 'အမျိုးအစား', 'ကျပ်']],
+      body: penalties.map(p => [p.date, p.therapistName, p.category, Number(p.amount).toLocaleString()]),
+    });
+    doc.save('Penalty_Report.pdf');
+  };
+
   const getStats = (id: string) => {
     const p = penalties.filter(item => item.therapistId === id);
     return { count: p.length, total: p.reduce((sum, item) => sum + Number(item.amount), 0), list: p };
@@ -70,9 +82,11 @@ export default function App() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {THERAPISTS.map(t => {
               const stats = getStats(t.id);
+              const isRed = stats.total > 0;
               return (
                 <div key={t.id} onClick={() => setSelectedTherapist({...t, ...stats})} 
-                     className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:bg-emerald-50 ${stats.total > 0 ? 'border-red-500 bg-red-50' : 'border-emerald-600 bg-white'}`}>
+                     className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:bg-emerald-50 relative overflow-hidden ${isRed ? 'border-red-500 bg-red-50' : 'border-emerald-600 bg-white'}`}>
+                  {isRed && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">ဒဏ်ကြေးရှိ</div>}
                   <h3 className="font-bold text-emerald-900 text-lg">{t.name}</h3>
                   <p className="text-sm font-bold text-emerald-800">စုစုပေါင်း: {stats.total.toLocaleString()} Ks ({stats.count} ကြိမ်)</p>
                 </div>
@@ -94,18 +108,23 @@ export default function App() {
         )}
 
         {activeTab === 'history' && (
-          <div className="bg-white rounded-xl shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 uppercase font-bold text-emerald-900"><tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">မှတ်ချက်</th><th className="p-3 text-left">ကျပ်</th>{!isPublic && <th className="p-3"></th>}</tr></thead>
-              <tbody>
-                {penalties.map(p => (
-                  <tr key={p.id} className="border-b">
-                    <td className="p-3">{p.date}</td><td className="p-3">{p.therapistName}</td><td className="p-3">{p.category}</td><td className="p-3">{p.remark}</td><td className="p-3 font-bold text-red-600">{Number(p.amount).toLocaleString()}</td>
-                    {!isPublic && <td className="p-3 text-center"><button onClick={() => deleteDoc(doc(db, 'penalties', p.id))} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button></td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            <button onClick={generatePDF} className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm">
+              <Download size={16}/> PDF ထုတ်ယူမည်
+            </button>
+            <div className="bg-white rounded-xl shadow overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100 uppercase font-bold text-emerald-900"><tr><th className="p-3 text-left">ရက်စွဲ</th><th className="p-3 text-left">အမည်</th><th className="p-3 text-left">အမျိုးအစား</th><th className="p-3 text-left">မှတ်ချက်</th><th className="p-3 text-left">ကျပ်</th>{!isPublic && <th className="p-3"></th>}</tr></thead>
+                <tbody>
+                  {penalties.map(p => (
+                    <tr key={p.id} className="border-b">
+                      <td className="p-3">{p.date}</td><td className="p-3">{p.therapistName}</td><td className="p-3">{p.category}</td><td className="p-3">{p.remark}</td><td className="p-3 font-bold text-red-600">{Number(p.amount).toLocaleString()}</td>
+                      {!isPublic && <td className="p-3 text-center"><button onClick={() => deleteDoc(doc(db, 'penalties', p.id))} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button></td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>
