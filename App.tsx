@@ -37,7 +37,6 @@ export default function App() {
     });
   }, []);
 
-  // ရက်လွန်တွက်ချက်သည့် Function (၁ ရက်လွန် = ၂ ဆ၊ ၂ ရက်လွန် = ၄ ဆ)
   const getDaysOverdue = (dateStr: string) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -49,9 +48,9 @@ export default function App() {
   };
 
   const calculateAmount = (p: any) => {
-    if (p.isPaid) return Number(p.finalAmount || p.amount); // ပေးပြီးသားဆိုရင် ပေးခဲ့တဲ့ပမာဏကိုပဲ ယူမည်
+    if (p.isPaid) return Number(p.finalAmount || p.amount); 
     const days = getDaysOverdue(p.date);
-    return Number(p.amount) * Math.pow(2, days); // ဆတိုးတွက်ခြင်း
+    return Number(p.amount) * Math.pow(2, days); 
   };
 
   const getStats = (id: string) => {
@@ -72,7 +71,7 @@ export default function App() {
       ...formData, 
       amount: Number(formData.amount), 
       therapistName: THERAPISTS.find(t=>t.id===formData.therapistId)?.name, 
-      isPaid: false, // အသစ်ဆိုလျှင် မဆောင်ရသေးဟု မှတ်မည်
+      isPaid: false, 
       createdAt: Date.now() 
     });
     setFormData({...formData, amount: '', remark: ''});
@@ -124,20 +123,32 @@ export default function App() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 no-print">
             {THERAPISTS.map(t => {
               const stats = getStats(t.id);
-              const isRed = stats.unpaidCount > 0; // မဆောင်ရသေးတဲ့ ဒဏ်ကြေးရှိမှ အနီပြမည်
+              const hasUnpaid = stats.unpaidCount > 0;
+              const hasPaidOnly = stats.unpaidCount === 0 && stats.count > 0;
+              
+              // ကတ်အရောင် သတ်မှတ်ခြင်း (အနီ၊ လိမ္မော်၊ အစိမ်း)
+              const cardClass = hasUnpaid 
+                ? 'border-red-500 bg-red-50' 
+                : hasPaidOnly 
+                  ? 'border-amber-500 bg-amber-50' 
+                  : 'border-emerald-600 bg-white';
+
               return (
                 <div key={t.id} onClick={() => setSelectedTherapist({...t, ...stats})} 
-                     className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:bg-emerald-50 relative overflow-hidden ${isRed ? 'border-red-500 bg-red-50' : 'border-emerald-600 bg-white'}`}>
+                     className={`p-4 rounded-xl shadow border-l-8 cursor-pointer hover:opacity-80 relative overflow-hidden transition-colors ${cardClass}`}>
                   
-                  {/* နဂိုအတိုင်း အနီရောင် Box လေး */}
-                  {isRed && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">ဒဏ်ကြေးရှိ</div>}
+                  {/* အနီရောင် Box - ဒဏ်ကြေးရှိ (မဆောင်ရသေး) */}
+                  {hasUnpaid && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးရှိ</div>}
                   
-                  {/* နဂိုအတိုင်း အစိမ်းရောင် Bold နာမည် */}
+                  {/* လိမ္မော်ရောင် Box - ဒဏ်ကြေးဆောင်ပြီး (မှတ်တမ်းရှိ) */}
+                  {hasPaidOnly && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးဆောင်ပြီး</div>}
+                  
                   <h3 className="font-bold text-emerald-900 text-lg">{t.name}</h3>
                   
                   <div className="mt-1 space-y-0.5">
                     {stats.totalUnpaid > 0 && <p className="text-sm font-bold text-red-600">မဆောင်ရသေး: {stats.totalUnpaid.toLocaleString()} Ks ({stats.unpaidCount} ခု)</p>}
-                    <p className="text-sm font-bold text-emerald-800">စုစုပေါင်း ပေးပြီး: {stats.totalPaid.toLocaleString()} Ks</p>
+                    {stats.totalPaid > 0 && <p className="text-sm font-bold text-emerald-800">ပေးဆောင်ပြီး: {stats.totalPaid.toLocaleString()} Ks</p>}
+                    {stats.count === 0 && <p className="text-sm font-bold text-emerald-700 mt-2 opacity-70">ဒဏ်ကြေးမှတ်တမ်းမရှိပါ</p>}
                   </div>
                 </div>
               );
@@ -149,12 +160,12 @@ export default function App() {
         {activeTab === 'add' && !isPublic && (
           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow space-y-4 no-print">
             <h2 className="font-bold text-emerald-900 text-lg">ဒဏ်ကြေးအသစ် မှတ်တမ်းတင်ရန်</h2>
-            <select className="w-full p-3 border rounded" onChange={e => setFormData({...formData, therapistId: e.target.value})}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-            <input type="date" className="w-full p-3 border rounded" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-            <select className="w-full p-3 border rounded" onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-            <input type="number" placeholder="အခြေခံပမာဏ (ကျပ်)" className="w-full p-3 border rounded" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
-            <textarea placeholder="မှတ်ချက်" className="w-full p-3 border rounded" value={formData.remark} onChange={e => setFormData({...formData, remark: e.target.value})} />
-            <button className="w-full bg-emerald-900 text-white p-3 rounded font-bold">မှတ်တမ်းတင်မည်</button>
+            <select className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" onChange={e => setFormData({...formData, therapistId: e.target.value})}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <input type="date" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required/>
+            <select className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" onChange={e => setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+            <input type="number" placeholder="အခြေခံပမာဏ (ကျပ်)" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required min="0"/>
+            <textarea placeholder="မှတ်ချက်" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" value={formData.remark} onChange={e => setFormData({...formData, remark: e.target.value})} />
+            <button className="w-full bg-emerald-900 hover:bg-emerald-800 transition-colors text-white p-3 rounded font-bold">မှတ်တမ်းတင်မည်</button>
           </form>
         )}
 
@@ -162,65 +173,70 @@ export default function App() {
         {activeTab === 'history' && (
           <div className="space-y-4">
             {!isPublic && (
-              <button onClick={handlePrintPDF} className="no-print bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm">
+              <button onClick={handlePrintPDF} className="no-print bg-red-600 hover:bg-red-700 transition-colors text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow">
                 <Download size={16}/> PDF ထုတ်ယူမည်
               </button>
             )}
 
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-white rounded-xl shadow overflow-hidden border border-slate-200">
               <table className="w-full text-sm">
-                <thead className="bg-slate-100 uppercase font-bold text-emerald-900">
+                <thead className="bg-emerald-50 border-b border-emerald-100 uppercase font-bold text-emerald-900">
                   <tr>
-                    <th className="p-3 text-left">ရက်စွဲ</th>
-                    <th className="p-3 text-left">အမည်</th>
-                    <th className="p-3 text-left">အမျိုးအစား/မှတ်ချက်</th>
-                    <th className="p-3 text-right">ကျသင့်ငွေ</th>
-                    {!isPublic && <th className="p-3 text-center no-print">လုပ်ဆောင်ချက်</th>}
+                    <th className="p-4 text-left">ရက်စွဲ</th>
+                    <th className="p-4 text-left">အမည်</th>
+                    <th className="p-4 text-left">အမျိုးအစား/မှတ်ချက်</th>
+                    <th className="p-4 text-right">ကျသင့်ငွေ</th>
+                    {!isPublic && <th className="p-4 text-center no-print">လုပ်ဆောင်ချက်</th>}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {penalties.map(p => {
                     const days = getDaysOverdue(p.date);
                     const amount = calculateAmount(p);
                     const isOverdue = !p.isPaid && days > 0;
 
                     return (
-                      <tr key={p.id} className="border-b hover:bg-slate-50">
-                        <td className="p-3">
-                          {p.date}
+                      <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-4">
+                          <div className="font-bold">{p.date}</div>
                           <div className="mt-1">
                             {p.isPaid ? (
                               <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">ပေးပြီး</span>
                             ) : (
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                                 {isOverdue ? `လွန်နေသည် (${days} ရက်)` : 'ယနေ့ဆောင်ရန်'}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="p-3 font-bold text-emerald-900">{p.therapistName}</td>
-                        <td className="p-3">
+                        <td className="p-4 font-bold text-emerald-900">{p.therapistName}</td>
+                        <td className="p-4">
                           <p>{p.category}</p>
-                          {p.remark && <p className="text-slate-500 text-xs">{p.remark}</p>}
+                          {p.remark && <p className="text-slate-500 text-xs mt-0.5">{p.remark}</p>}
                         </td>
-                        <td className={`p-3 text-right font-bold ${p.isPaid ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <td className={`p-4 text-right font-bold ${p.isPaid ? 'text-emerald-600' : 'text-red-600'}`}>
                           {amount.toLocaleString()} Ks
                         </td>
                         {!isPublic && (
-                          <td className="p-3 text-center no-print flex justify-center gap-3">
-                            {!p.isPaid && (
-                              <button onClick={() => handleMarkAsPaid(p)} className="text-emerald-500 hover:text-emerald-700" title="ပေးဆောင်ပြီးဖြစ်ကြောင်း မှတ်မည်">
-                                <CheckCircle size={18}/>
+                          <td className="p-4 text-center no-print">
+                            <div className="flex justify-center gap-3">
+                              {!p.isPaid && (
+                                <button onClick={() => handleMarkAsPaid(p)} className="text-emerald-500 hover:text-emerald-700 bg-emerald-50 p-1.5 rounded-full" title="ပေးဆောင်ပြီးဖြစ်ကြောင်း မှတ်မည်">
+                                  <CheckCircle size={18}/>
+                                </button>
+                              )}
+                              <button onClick={() => {if(window.confirm('ဖျက်ရန်သေချာပါသလား?')) deleteDoc(doc(db, 'penalties', p.id));}} className="text-red-400 hover:text-red-600 bg-red-50 p-1.5 rounded-full" title="ဖျက်ရန်">
+                                <Trash2 size={18}/>
                               </button>
-                            )}
-                            <button onClick={() => {if(window.confirm('ဖျက်ရန်သေချာပါသလား?')) deleteDoc(doc(db, 'penalties', p.id));}} className="text-red-500 hover:text-red-700" title="ဖျက်ရန်">
-                              <Trash2 size={18}/>
-                            </button>
+                            </div>
                           </td>
                         )}
                       </tr>
                     );
                   })}
+                  {penalties.length === 0 && (
+                    <tr><td colSpan={5} className="p-8 text-center text-slate-400">မှတ်တမ်း မရှိသေးပါ</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -228,35 +244,37 @@ export default function App() {
         )}
       </main>
 
-      {/* Detail Modal (ဝန်ထမ်းနာမည်နှိပ်လျှင် ပေါ်မည့်အကွက်) */}
+      {/* Detail Modal */}
       {selectedTherapist && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 no-print">
-          <div className="bg-white w-full max-w-sm rounded-xl p-6 relative">
-            <button onClick={() => setSelectedTherapist(null)} className="absolute top-2 right-2"><X/></button>
-            <h2 className="font-bold text-emerald-900 text-lg mb-4">{selectedTherapist.name} ၏ မှတ်တမ်း</h2>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center p-4 z-50 no-print">
+          <div className="bg-white w-full max-w-sm rounded-xl p-6 relative shadow-2xl">
+            <button onClick={() => setSelectedTherapist(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full"><X size={20}/></button>
+            <h2 className="font-bold text-emerald-900 text-lg border-b pb-3 mb-4">{selectedTherapist.name} ၏ မှတ်တမ်း</h2>
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
               {selectedTherapist.list.length === 0 ? (
-                <p className="text-slate-500 text-sm">မှတ်တမ်းမရှိပါ။</p>
+                <p className="text-slate-500 text-sm text-center py-4">မှတ်တမ်းမရှိပါ။</p>
               ) : (
                 selectedTherapist.list.map((p: any) => {
                   const days = getDaysOverdue(p.date);
                   const amount = calculateAmount(p);
                   return (
-                    <div key={p.id} className={`border-b pb-2 text-sm ${p.isPaid ? 'opacity-70' : ''}`}>
+                    <div key={p.id} className={`border p-3 rounded-lg flex flex-col gap-1 ${p.isPaid ? 'border-emerald-200 bg-emerald-50 opacity-80' : 'border-red-200 bg-red-50'}`}>
                       <div className="flex justify-between items-center">
-                        <p className="font-bold text-emerald-800">{p.date}</p>
-                        <p className={`font-bold ${p.isPaid ? 'text-emerald-600' : 'text-red-600'}`}>{amount.toLocaleString()} Ks</p>
+                        <span className="font-bold text-slate-800 text-sm">{p.date}</span>
+                        <span className={`font-bold ${p.isPaid ? 'text-emerald-700' : 'text-red-600'}`}>{amount.toLocaleString()} Ks</span>
                       </div>
-                      <p>{p.category}</p>
-                      <p className="text-[10px] font-bold mt-1">
-                        {p.isPaid ? (
-                           <span className="text-emerald-600">✓ ပေးဆောင်ပြီး ({p.paidDate})</span>
-                        ) : (
-                           <span className={days > 0 ? 'text-red-600' : 'text-orange-600'}>
-                             {days > 0 ? `! ရက်လွန်နေသည် (${days} ရက်)` : '• ယနေ့ဆောင်ရန်'}
-                           </span>
-                        )}
-                      </p>
+                      <p className="text-slate-700 text-sm">{p.category}</p>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-xs font-bold text-slate-500">
+                          {p.isPaid ? (
+                             <span className="text-emerald-700">✓ ပေးဆောင်ပြီး ({p.paidDate})</span>
+                          ) : (
+                             <span className={days > 0 ? 'text-red-600' : 'text-amber-600'}>
+                               {days > 0 ? `! ရက်လွန်နေသည် (${days} ရက်)` : '• ယနေ့ဆောင်ရန်'}
+                             </span>
+                          )}
+                        </span>
+                      </div>
                     </div>
                   );
                 })
