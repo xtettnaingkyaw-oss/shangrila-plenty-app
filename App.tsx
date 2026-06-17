@@ -213,10 +213,8 @@ export default function App() {
                 <div key={t.id} onClick={() => setSelectedTherapist({...t, ...stats})} 
                      className={`p-4 pt-6 rounded-xl shadow border-l-8 cursor-pointer hover:opacity-80 relative overflow-hidden transition-colors ${cardClass}`}>
                   
-                  {/* အပ်ငွေ Box ကို ဘယ်ဘက် အပေါ်ထောင့်သို့ ရွှေ့လိုက်ပါပြီ */}
                   {stats.depositBalance > 0 && <div className="absolute top-0 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-br-lg font-bold shadow">အပ်ငွေ: {stats.depositBalance.toLocaleString()} Ks</div>}
 
-                  {/* ဒဏ်ကြေးရှိ/မရှိ Box များ (ညာဘက် အပေါ်ထောင့်) */}
                   {hasUnpaid && <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးရှိ</div>}
                   {hasPaidOnly && <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow">ဒဏ်ကြေးဆောင်ပြီး</div>}
                   
@@ -316,7 +314,7 @@ export default function App() {
                           <div className="font-bold">{p.date}</div>
                           <div className="mt-1">
                             {p.isPaid ? (
-                              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${p.paidMethod === 'deposit' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                 {p.paidMethod === 'deposit' ? 'အပ်ငွေမှ နှုတ်ပြီး' : 'ပေးပြီး'}
                               </span>
                             ) : (
@@ -331,7 +329,7 @@ export default function App() {
                           <p>{p.category}</p>
                           {p.remark && <p className="text-red-600 font-bold text-xs mt-1">- {p.remark}</p>}
                         </td>
-                        <td className={`p-4 text-right font-bold ${p.isPaid ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <td className={`p-4 text-right font-bold ${p.isPaid ? (p.paidMethod === 'deposit' ? 'text-blue-700' : 'text-emerald-600') : 'text-red-600'}`}>
                           {amount.toLocaleString()} Ks
                         </td>
                         {!isPublic && (
@@ -382,11 +380,21 @@ export default function App() {
                 selectedTherapist.list.map((p: any) => {
                   const days = getDaysOverdue(p.date);
                   const amount = calculateAmount(p);
+                  
+                  // အပ်ငွေမှ နှုတ်ထားခြင်းဖြစ်လျှင် အပြာရောင် Box ဖြစ်စေရန်
+                  const boxBgClass = p.isPaid 
+                    ? (p.paidMethod === 'deposit' ? 'border-blue-200 bg-blue-50 opacity-90' : 'border-emerald-200 bg-emerald-50 opacity-90') 
+                    : 'border-red-200 bg-red-50';
+                    
+                  const amtColor = p.isPaid 
+                    ? (p.paidMethod === 'deposit' ? 'text-blue-700' : 'text-emerald-700') 
+                    : 'text-red-600';
+
                   return (
-                    <div key={p.id} className={`border p-3 rounded-lg flex flex-col gap-1 ${p.isPaid ? 'border-emerald-200 bg-emerald-50 opacity-80' : 'border-red-200 bg-red-50'}`}>
+                    <div key={p.id} className={`border p-3 rounded-lg flex flex-col gap-1 ${boxBgClass}`}>
                       <div className="flex justify-between items-center">
                         <span className="font-bold text-slate-800 text-sm">{p.date}</span>
-                        <span className={`font-bold ${p.isPaid ? 'text-emerald-700' : 'text-red-600'}`}>{amount.toLocaleString()} Ks</span>
+                        <span className={`font-bold ${amtColor}`}>{amount.toLocaleString()} Ks</span>
                       </div>
                       <p className="text-slate-700 text-sm">{p.category}</p>
                       
@@ -395,7 +403,9 @@ export default function App() {
                       <div className="flex justify-between items-center mt-1 border-t border-slate-200 pt-2">
                         <span className="text-xs font-bold text-slate-500">
                           {p.isPaid ? (
-                             <span className="text-emerald-700">✓ {p.paidMethod === 'deposit' ? 'အပ်ငွေမှနှုတ်ပြီး' : 'ပေးဆောင်ပြီး'} ({p.paidDate})</span>
+                             <span className={p.paidMethod === 'deposit' ? "text-blue-700" : "text-emerald-700"}>
+                               ✓ {p.paidMethod === 'deposit' ? 'အပ်ငွေမှနှုတ်ပြီး' : 'ပေးဆောင်ပြီး'} ({p.paidDate})
+                             </span>
                           ) : (
                              <span className={days > 0 ? 'text-red-600' : 'text-amber-600'}>
                                {days > 0 ? `! ရက်လွန်နေသည် (${days} ရက်)` : '• ယနေ့ဆောင်ရန်'}
