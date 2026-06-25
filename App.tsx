@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, query, orderBy } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { Home, FilePlus, ClipboardList, Trash2, X, Share2, Download, CheckCircle, Calendar, Wallet } from 'lucide-react';
+import { Home, FilePlus, ClipboardList, Trash2, X, Share2, Download, CheckCircle, Calendar, Wallet, Banknote } from 'lucide-react';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA7wnYTB2uevwYl3atyTJ2EZSFc8r65eR4",
@@ -19,17 +19,19 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 const THERAPISTS = Array.from({ length: 15 }, (_, i) => ({ id: (i + 1).toString(), name: `Therapist No-${i + 1}` }));
-const CATEGORIES = ["ဆိုင်သန့်ရှင်းရေးတာဝန် ပျက်ကွက်ခြင်း", "Out​ Pass စည်းကမ်းများ", "Jibble Clock In/ Clock Out စည်းကမ်းများ", "ဆူညံခြင်း၊ ဂိမ်းကစားခြင်း၊ စလော့ဆော့ခြင်း", "ဧည့်သည်အား ဝန်ဆောင်မှုအားနည်းခြင်း", "စည်းကမ်းမဲ့ ဆေးလိပ်၊ အရက်၊ မူးယစ်ဆေးသုံးခြင်း၊ ဝန်ထမ်းအချင်းချင်း ရန်ဖြစ်ခြင်း", "မီးဖိုချောင်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အိပ်ချိန်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အခြား ဖောက်ဖျက်မှုများ"];
+const CATEGORIES = ["ဆိုင်သန့်ရှင်းရေးတာဝန် ပျက်ကွက်ခြင်း", "Out Pass စည်းကမ်းများ", "Jibble Clock In/ Clock Out စည်းကမ်းများ", "ဆူညံခြင်း၊ ဂိမ်းကစားခြင်း၊ စလော့ဆော့ခြင်း", "ဧည့်သည်အား ဝန်ဆောင်မှုအားနည်းခြင်း", "စည်းကမ်းမဲ့ ဆေးလိပ်၊ အရက်၊ မူးယစ်ဆေးသုံးခြင်း၊ ဝန်ထမ်းအချင်းချင်း ရန်ဖြစ်ခြင်း", "မီးဖိုချောင်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အိပ်ချိန်စည်းကမ်း ဖောက်ဖျက်ခြင်း", "အခြား ဖောက်ဖျက်မှုများ"];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [penalties, setPenalties] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]); 
+  const [loans, setLoans] = useState<any[]>([]); // ချေးငွေ/ကြိုထုတ်ငွေ State
   const [isPublic, setIsPublic] = useState(false);
   const [selectedTherapist, setSelectedTherapist] = useState<any>(null);
   
   const [formData, setFormData] = useState({ therapistId: '1', category: CATEGORIES[0], amount: '', remark: '', date: new Date().toISOString().split('T')[0] });
   const [depositForm, setDepositForm] = useState({ therapistId: '1', amount: '', note: '' });
+  const [loanForm, setLoanForm] = useState({ therapistId: '1', amount: '', note: '', date: new Date().toISOString().split('T')[0] });
 
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -49,12 +51,21 @@ export default function App() {
     const qDeposits = query(collection(db, 'deposits'), orderBy('createdAt', 'desc'));
     const unsubD = onSnapshot(qDeposits, (snapshot) => setDeposits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
 
-    return () => { unsubP(); unsubD(); };
+    const qLoans = query(collection(db, 'loans'), orderBy('createdAt', 'desc'));
+    const unsubL = onSnapshot(qLoans, (snapshot) => setLoans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+
+    return () => { unsubP(); unsubD(); unsubL(); };
   }, []);
 
   const filteredPenalties = penalties.filter(p => {
     const pDate = p.date;
     return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate);
+  });
+
+  // ချေးငွေများကို ရက်စွဲအလိုက် စစ်ထုတ်ခြင်း
+  const filteredLoans = loans.filter(l => {
+    const lDate = l.date;
+    return (!startDate || lDate >= startDate) && (!endDate || lDate <= endDate);
   });
 
   const getDaysOverdue = (dateStr: string) => {
@@ -84,7 +95,10 @@ export default function App() {
     const d = deposits.filter(item => String(item.therapistId) === id);
     const depositBalance = d.reduce((sum, item) => sum + Number(item.amount), 0);
 
-    return { count: p.length, unpaidCount: unpaid.length, totalUnpaid, totalPaid, depositBalance, list: p };
+    const l = filteredLoans.filter(item => String(item.therapistId) === id);
+    const totalLoan = l.reduce((sum, item) => sum + Number(item.amount), 0);
+
+    return { count: p.length, unpaidCount: unpaid.length, totalUnpaid, totalPaid, depositBalance, totalLoan, list: p, loanList: l };
   };
 
   const handleSubmitPenalty = async (e: React.FormEvent) => {
@@ -115,6 +129,20 @@ export default function App() {
     });
     setDepositForm({...depositForm, amount: '', note: ''});
     alert("အပ်ငွေ မှတ်တမ်းတင်ပြီးပါပြီ");
+  };
+
+  const handleSubmitLoan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!loanForm.amount) return alert("ပမာဏဖြည့်ပါ");
+    await addDoc(collection(db, 'loans'), {
+      therapistId: loanForm.therapistId,
+      amount: Number(loanForm.amount), 
+      date: loanForm.date,
+      note: loanForm.note || 'ကြိုထုတ်ငွေ',
+      createdAt: Date.now()
+    });
+    setLoanForm({...loanForm, amount: '', note: ''});
+    alert("ချေးငွေ/ကြိုထုတ်ငွေ မှတ်တမ်းတင်ပြီးပါပြီ");
   };
 
   const handleMarkAsPaid = async (p: any, method: 'cash' | 'deposit') => {
@@ -170,22 +198,23 @@ export default function App() {
         }
       `}</style>
 
-      <nav className="bg-emerald-900 text-white p-4 flex justify-between shadow-lg sticky top-0 z-50 no-print">
-        <h1 className="font-bold text-xl">THE SHANGRI-LA</h1>
+      <nav className="bg-emerald-900 text-white p-4 flex justify-between shadow-lg sticky top-0 z-50 no-print overflow-x-auto">
+        <h1 className="font-bold text-xl whitespace-nowrap mr-4">THE SHANGRI-LA</h1>
         {!isPublic && (
-          <div className="flex gap-4">
-            <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-amber-400' : ''}><Home/></button>
-            <button onClick={() => setActiveTab('add')} className={activeTab === 'add' ? 'text-amber-400' : ''}><FilePlus/></button>
-            <button onClick={() => setActiveTab('history')} className={activeTab === 'history' ? 'text-amber-400' : ''}><ClipboardList/></button>
-            <button onClick={() => setActiveTab('deposits')} className={activeTab === 'deposits' ? 'text-amber-400' : ''}><Wallet/></button>
-            <button onClick={() => {navigator.clipboard.writeText(window.location.origin + '?mode=public'); alert("Link ကူးယူပြီးပါပြီ")}}><Share2/></button>
+          <div className="flex gap-4 items-center">
+            <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-amber-400' : 'hover:text-amber-200'} title="ပင်မစာမျက်နှာ"><Home size={20}/></button>
+            <button onClick={() => setActiveTab('add')} className={activeTab === 'add' ? 'text-amber-400' : 'hover:text-amber-200'} title="ဒဏ်ကြေးသွင်းရန်"><FilePlus size={20}/></button>
+            <button onClick={() => setActiveTab('history')} className={activeTab === 'history' ? 'text-amber-400' : 'hover:text-amber-200'} title="မှတ်တမ်းများ"><ClipboardList size={20}/></button>
+            <button onClick={() => setActiveTab('deposits')} className={activeTab === 'deposits' ? 'text-amber-400' : 'hover:text-amber-200'} title="အပ်ငွေစီမံရန်"><Wallet size={20}/></button>
+            <button onClick={() => setActiveTab('loans')} className={activeTab === 'loans' ? 'text-amber-400' : 'hover:text-amber-200'} title="ချေးငွေ/ကြိုထုတ်ငွေ"><Banknote size={20}/></button>
+            <button onClick={() => {navigator.clipboard.writeText(window.location.origin + '?mode=public'); alert("Link ကူးယူပြီးပါပြီ")}} className="hover:text-amber-200" title="Link ကူးယူရန်"><Share2 size={20}/></button>
           </div>
         )}
       </nav>
 
       <main className="p-4 max-w-4xl mx-auto print-section">
         
-        {(activeTab === 'dashboard' || activeTab === 'history') && (
+        {(activeTab === 'dashboard' || activeTab === 'history' || activeTab === 'loans') && (
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4 flex flex-col sm:flex-row gap-4 items-center justify-between no-print">
             <h2 className="font-bold text-emerald-900 flex items-center gap-2"><Calendar size={20} /> ရက်စွဲအလိုက် ကြည့်ရန်</h2>
             <div className="flex gap-2 items-center w-full sm:w-auto">
@@ -225,7 +254,8 @@ export default function App() {
                   <div className="mt-2 space-y-0.5">
                     {stats.totalUnpaid > 0 && <p className="text-sm font-bold text-red-600">မဆောင်ရသေး: {stats.totalUnpaid.toLocaleString()} Ks ({stats.unpaidCount} ခု)</p>}
                     {stats.totalPaid > 0 && <p className="text-sm font-bold text-emerald-800">ပေးဆောင်ပြီး: {stats.totalPaid.toLocaleString()} Ks</p>}
-                    {stats.count === 0 && <p className="text-sm font-bold text-emerald-700 mt-2 opacity-70">ဒဏ်ကြေးမှတ်တမ်းမရှိပါ</p>}
+                    {stats.totalLoan > 0 && <p className="text-sm font-bold text-purple-700">ကြိုထုတ်ငွေ: {stats.totalLoan.toLocaleString()} Ks</p>}
+                    {stats.count === 0 && stats.totalLoan === 0 && <p className="text-sm font-bold text-emerald-700 mt-2 opacity-70">မှတ်တမ်းမရှိပါ</p>}
                   </div>
                 </div>
               );
@@ -277,6 +307,59 @@ export default function App() {
                     </tr>
                   ))}
                   {deposits.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-slate-400">မှတ်တမ်းမရှိသေးပါ</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ကြိုထုတ်ငွေ / ချေးငွေ Tab အသစ် */}
+        {activeTab === 'loans' && !isPublic && (
+          <div className="space-y-6 no-print">
+            <form onSubmit={handleSubmitLoan} className="bg-white p-6 rounded-xl shadow space-y-4">
+              <h2 className="font-bold text-purple-900 text-lg flex items-center gap-2"><Banknote/> ကြိုထုတ်ငွေ / ချေးငွေ မှတ်တမ်းတင်ရန်</h2>
+              <select className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-purple-500" onChange={e => setLoanForm({...loanForm, therapistId: e.target.value})} value={loanForm.therapistId}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+              <input type="date" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-purple-500" value={loanForm.date} onChange={e => setLoanForm({...loanForm, date: e.target.value})} required/>
+              <input type="number" placeholder="ကြိုထုတ်ငွေပမာဏ (ကျပ်)" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-purple-500" value={loanForm.amount} onChange={e => setLoanForm({...loanForm, amount: e.target.value})} required min="0"/>
+              <input type="text" placeholder="မှတ်ချက် (ဥပမာ- ရက်လယ် ကြိုထုတ်ငွေ)" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-purple-500" value={loanForm.note} onChange={e => setLoanForm({...loanForm, note: e.target.value})} />
+              <button className="w-full bg-purple-700 hover:bg-purple-800 transition-colors text-white p-3 rounded font-bold">ကြိုထုတ်ငွေ စာရင်းသွင်းမည်</button>
+            </form>
+
+            <div className="bg-white rounded-xl shadow overflow-hidden border border-slate-200">
+              <h3 className="p-4 bg-purple-50 font-bold text-purple-900 border-b flex justify-between">
+                <span>ကြိုထုတ်ငွေ မှတ်တမ်းများ</span>
+                <button onClick={handlePrintPDF} className="no-print bg-purple-600 hover:bg-purple-700 transition-colors text-white px-3 py-1 rounded text-xs flex items-center gap-1 shadow">
+                  <Download size={12}/> PDF ထုတ်ယူမည်
+                </button>
+              </h3>
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b text-slate-600">
+                  <tr>
+                    <th className="p-3 text-left">ရက်စွဲ / အမည်</th>
+                    <th className="p-3 text-left">မှတ်ချက်</th>
+                    <th className="p-3 text-right">ပမာဏ</th>
+                    <th className="p-3 text-center">ဖျက်ရန်</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLoans.map(l => (
+                    <tr key={l.id} className="border-b hover:bg-purple-50 transition-colors">
+                      <td className="p-3">
+                        <span className="font-bold">{l.date}</span><br/>
+                        <span className="text-emerald-900 font-bold text-xs">{THERAPISTS.find(t=>t.id===l.therapistId)?.name}</span>
+                      </td>
+                      <td className="p-3 text-slate-600">{l.note}</td>
+                      <td className="p-3 text-right font-bold text-purple-700">
+                        {Number(l.amount).toLocaleString()} Ks
+                      </td>
+                      <td className="p-3 text-center">
+                        <button onClick={() => {if(window.confirm('ဖျက်ရန်သေချာပါသလား?')) deleteDoc(doc(db, 'loans', l.id));}} className="text-slate-400 hover:text-red-600 p-1">
+                          <Trash2 size={16}/>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredLoans.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-slate-400">ဤရက်စွဲအတွင်း မှတ်တမ်းမရှိသေးပါ</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -367,56 +450,82 @@ export default function App() {
       {/* Detail Modal */}
       {selectedTherapist && (
         <div className="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center p-4 z-50 no-print">
-          <div className="bg-white w-full max-w-sm rounded-xl p-6 relative shadow-2xl">
-            <button onClick={() => setSelectedTherapist(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full"><X size={20}/></button>
-            <h2 className="font-bold text-emerald-900 text-lg border-b pb-3 mb-4 flex justify-between">
+          <div className="bg-white w-full max-w-sm rounded-xl p-6 relative shadow-2xl max-h-[90vh] flex flex-col">
+            <button onClick={() => setSelectedTherapist(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 bg-slate-100 p-1 rounded-full z-10"><X size={20}/></button>
+            <h2 className="font-bold text-emerald-900 text-lg border-b pb-3 mb-4 flex justify-between pr-8">
               {selectedTherapist.name}
               {selectedTherapist.depositBalance > 0 && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">အပ်ငွေ: {selectedTherapist.depositBalance.toLocaleString()}</span>}
             </h2>
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-              {selectedTherapist.list.length === 0 ? (
-                <p className="text-slate-500 text-sm text-center py-4">ဤရက်စွဲအတွင်း မှတ်တမ်းမရှိပါ။</p>
-              ) : (
-                selectedTherapist.list.map((p: any) => {
-                  const days = getDaysOverdue(p.date);
-                  const amount = calculateAmount(p);
-                  
-                  // အပ်ငွေမှ နှုတ်ထားခြင်းဖြစ်လျှင် အပြာရောင် Box ဖြစ်စေရန်
-                  const boxBgClass = p.isPaid 
-                    ? (p.paidMethod === 'deposit' ? 'border-blue-200 bg-blue-50 opacity-90' : 'border-emerald-200 bg-emerald-50 opacity-90') 
-                    : 'border-red-200 bg-red-50';
-                    
-                  const amtColor = p.isPaid 
-                    ? (p.paidMethod === 'deposit' ? 'text-blue-700' : 'text-emerald-700') 
-                    : 'text-red-600';
+            
+            <div className="overflow-y-auto pr-2 custom-scrollbar">
+              
+              {/* ဒဏ်ကြေးမှတ်တမ်းများ */}
+              <div className="mb-6">
+                <h3 className="text-sm font-bold text-slate-500 mb-3">ဒဏ်ကြေးမှတ်တမ်း</h3>
+                <div className="space-y-3">
+                  {selectedTherapist.list.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-2">ဤရက်စွဲအတွင်း မှတ်တမ်းမရှိပါ။</p>
+                  ) : (
+                    selectedTherapist.list.map((p: any) => {
+                      const days = getDaysOverdue(p.date);
+                      const amount = calculateAmount(p);
+                      
+                      const boxBgClass = p.isPaid 
+                        ? (p.paidMethod === 'deposit' ? 'border-blue-200 bg-blue-50 opacity-90' : 'border-emerald-200 bg-emerald-50 opacity-90') 
+                        : 'border-red-200 bg-red-50';
+                        
+                      const amtColor = p.isPaid 
+                        ? (p.paidMethod === 'deposit' ? 'text-blue-700' : 'text-emerald-700') 
+                        : 'text-red-600';
 
-                  return (
-                    <div key={p.id} className={`border p-3 rounded-lg flex flex-col gap-1 ${boxBgClass}`}>
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-slate-800 text-sm">{p.date}</span>
-                        <span className={`font-bold ${amtColor}`}>{amount.toLocaleString()} Ks</span>
+                      return (
+                        <div key={p.id} className={`border p-3 rounded-lg flex flex-col gap-1 ${boxBgClass}`}>
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-slate-800 text-sm">{p.date}</span>
+                            <span className={`font-bold ${amtColor}`}>{amount.toLocaleString()} Ks</span>
+                          </div>
+                          <p className="text-slate-700 text-sm">{p.category}</p>
+                          
+                          {p.remark && <p className="text-red-600 font-bold text-xs mt-1">- {p.remark}</p>}
+                          
+                          <div className="flex justify-between items-center mt-1 border-t border-slate-200 pt-2">
+                            <span className="text-xs font-bold text-slate-500">
+                              {p.isPaid ? (
+                                 <span className={p.paidMethod === 'deposit' ? "text-blue-700" : "text-emerald-700"}>
+                                   ✓ {p.paidMethod === 'deposit' ? 'အပ်ငွေမှနှုတ်ပြီး' : 'ပေးဆောင်ပြီး'} ({p.paidDate})
+                                 </span>
+                              ) : (
+                                 <span className={days > 0 ? 'text-red-600' : 'text-amber-600'}>
+                                   {days > 0 ? `! ရက်လွန်နေသည် (${days} ရက်)` : '• ယနေ့ဆောင်ရန်'}
+                                 </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* ကြိုထုတ်ငွေ မှတ်တမ်းများ */}
+              {selectedTherapist.loanList && selectedTherapist.loanList.length > 0 && (
+                <div className="border-t border-slate-200 pt-4">
+                  <h3 className="text-sm font-bold text-purple-800 mb-3">ကြိုထုတ်ငွေ / ချေးငွေ မှတ်တမ်း</h3>
+                  <div className="space-y-3">
+                    {selectedTherapist.loanList.map((loan: any) => (
+                      <div key={loan.id} className="border border-purple-200 bg-purple-50 p-3 rounded-lg flex flex-col gap-1">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-slate-800 text-sm">{loan.date}</span>
+                          <span className="font-bold text-purple-700">{Number(loan.amount).toLocaleString()} Ks</span>
+                        </div>
+                        <p className="text-slate-600 text-sm">{loan.note}</p>
                       </div>
-                      <p className="text-slate-700 text-sm">{p.category}</p>
-                      
-                      {p.remark && <p className="text-red-600 font-bold text-xs mt-1">- {p.remark}</p>}
-                      
-                      <div className="flex justify-between items-center mt-1 border-t border-slate-200 pt-2">
-                        <span className="text-xs font-bold text-slate-500">
-                          {p.isPaid ? (
-                             <span className={p.paidMethod === 'deposit' ? "text-blue-700" : "text-emerald-700"}>
-                               ✓ {p.paidMethod === 'deposit' ? 'အပ်ငွေမှနှုတ်ပြီး' : 'ပေးဆောင်ပြီး'} ({p.paidDate})
-                             </span>
-                          ) : (
-                             <span className={days > 0 ? 'text-red-600' : 'text-amber-600'}>
-                               {days > 0 ? `! ရက်လွန်နေသည် (${days} ရက်)` : '• ယနေ့ဆောင်ရန်'}
-                             </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
+                    ))}
+                  </div>
+                </div>
               )}
+
             </div>
           </div>
         </div>
