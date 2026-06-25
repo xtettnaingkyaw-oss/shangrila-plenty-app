@@ -25,13 +25,22 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [penalties, setPenalties] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]); 
-  const [loans, setLoans] = useState<any[]>([]); // ချေးငွေ/ကြိုထုတ်ငွေ State
+  const [loans, setLoans] = useState<any[]>([]); 
   const [isPublic, setIsPublic] = useState(false);
   const [selectedTherapist, setSelectedTherapist] = useState<any>(null);
   
   const [formData, setFormData] = useState({ therapistId: '1', category: CATEGORIES[0], amount: '', remark: '', date: new Date().toISOString().split('T')[0] });
   const [depositForm, setDepositForm] = useState({ therapistId: '1', amount: '', note: '' });
-  const [loanForm, setLoanForm] = useState({ therapistId: '1', amount: '', note: '', date: new Date().toISOString().split('T')[0] });
+  
+  // ကြိုထုတ်ငွေအတွက် Form State အသစ်
+  const [loanForm, setLoanForm] = useState({ 
+    therapistId: '1', 
+    amount: '', 
+    note: '', 
+    date: new Date().toISOString().split('T')[0],
+    type: 'borrow', // 'borrow' = ကြိုထုတ်, 'repay' = ပြန်ဆပ်
+    repayMethod: 'cash' // 'cash' = လက်ငင်း, 'salary' = လစာဖြတ်
+  });
 
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -62,7 +71,6 @@ export default function App() {
     return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate);
   });
 
-  // ချေးငွေများကို ရက်စွဲအလိုက် စစ်ထုတ်ခြင်း
   const filteredLoans = loans.filter(l => {
     const lDate = l.date;
     return (!startDate || lDate >= startDate) && (!endDate || lDate <= endDate);
@@ -92,13 +100,17 @@ export default function App() {
     const totalUnpaid = unpaid.reduce((sum, item) => sum + calculateAmount(item), 0);
     const totalPaid = paid.reduce((sum, item) => sum + calculateAmount(item), 0);
     
-    const d = deposits.filter(item => String(item.therapistId) === id);
-    const depositBalance = d.reduce((sum, item) => sum + Number(item.amount), 0);
+    // အပ်ငွေနှင့် ကြိုထုတ်ငွေ လက်ကျန်များကို Date Filter မလုပ်ဘဲ အချိန်ပြည့် (Lifetime Balance) တွက်ချက်သည်
+    const d_all = deposits.filter(item => String(item.therapistId) === id);
+    const depositBalance = d_all.reduce((sum, item) => sum + Number(item.amount), 0);
 
-    const l = filteredLoans.filter(item => String(item.therapistId) === id);
-    const totalLoan = l.reduce((sum, item) => sum + Number(item.amount), 0);
+    const l_all = loans.filter(item => String(item.therapistId) === id);
+    const totalLoan = l_all.reduce((sum, item) => sum + Number(item.amount), 0);
+    
+    // Modal တွင်ပြရန် Date Filter လုပ်ထားသော မှတ်တမ်းများ
+    const l_filtered = filteredLoans.filter(item => String(item.therapistId) === id);
 
-    return { count: p.length, unpaidCount: unpaid.length, totalUnpaid, totalPaid, depositBalance, totalLoan, list: p, loanList: l };
+    return { count: p.length, unpaidCount: unpaid.length, totalUnpaid, totalPaid, depositBalance, totalLoan, list: p, loanList: l_filtered };
   };
 
   const handleSubmitPenalty = async (e: React.FormEvent) => {
@@ -131,18 +143,46 @@ export default function App() {
     alert("အပ်ငွေ မှတ်တမ်းတင်ပြီးပါပြီ");
   };
 
+  // ကြိုထုတ်ငွေ / ပြန်ဆပ်ငွေ တွက်ချက်သိမ်းဆည်းခြင်း
   const handleSubmitLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!loanForm.amount) return alert("ပမာဏဖြည့်ပါ");
+    
+    const amountNum = Number(loanForm.amount);
+    let finalAmount = amountNum;
+    let finalNote = loanForm.note;
+
+    if (loanForm.type === 'repay') {
+      const currentBalance = getStats(loanForm.therapistId).totalLoan;
+      
+      if (amountNum > currentBalance) {
+        return alert(`လက်ကျန် ကြိုထုတ်ငွေ (${currentBalance.toLocaleString()} Ks) ထက် ကျော်လွန်၍ ဆပ်၍မရပါ။`);
+      }
+      
+      finalAmount = -amountNum; // ပြန်ဆပ်ငွေဖြစ်၍ အနှုတ်ကိန်းဖြစ်ရမည်
+      
+      // မှတ်ချက် မရေးထားပါက Default အလိုအလျောက် ဖြည့်ပေးမည်
+      if (!finalNote) {
+        finalNote = loanForm.repayMethod === 'cash' ? 'လက်ငင်းငွေဖြင့် ပြန်ဆပ်သည်' : 'လစာထဲမှ နှုတ်၍ ပြန်ဆပ်သည်';
+      } else {
+        finalNote = (loanForm.repayMethod === 'cash' ? '[လက်ငင်း] ' : '[လစာဖြတ်] ') + finalNote;
+      }
+    } else {
+      if (!finalNote) finalNote = 'ကြိုထုတ်ငွေ';
+    }
+
     await addDoc(collection(db, 'loans'), {
       therapistId: loanForm.therapistId,
-      amount: Number(loanForm.amount), 
+      amount: finalAmount, 
       date: loanForm.date,
-      note: loanForm.note || 'ကြိုထုတ်ငွေ',
+      type: loanForm.type,
+      repayMethod: loanForm.type === 'repay' ? loanForm.repayMethod : null,
+      note: finalNote,
       createdAt: Date.now()
     });
+    
     setLoanForm({...loanForm, amount: '', note: ''});
-    alert("ချေးငွေ/ကြိုထုတ်ငွေ မှတ်တမ်းတင်ပြီးပါပြီ");
+    alert("မှတ်တမ်းတင်ပြီးပါပြီ");
   };
 
   const handleMarkAsPaid = async (p: any, method: 'cash' | 'deposit') => {
@@ -313,21 +353,48 @@ export default function App() {
           </div>
         )}
 
-        {/* ကြိုထုတ်ငွေ / ချေးငွေ Tab အသစ် */}
+        {/* ကြိုထုတ်ငွေ / ပြန်ဆပ်ငွေ Tab အသစ် */}
         {activeTab === 'loans' && !isPublic && (
           <div className="space-y-6 no-print">
             <form onSubmit={handleSubmitLoan} className="bg-white p-6 rounded-xl shadow space-y-4">
-              <h2 className="font-bold text-purple-900 text-lg flex items-center gap-2"><Banknote/> ကြိုထုတ်ငွေ / ချေးငွေ မှတ်တမ်းတင်ရန်</h2>
-              <select className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-purple-500" onChange={e => setLoanForm({...loanForm, therapistId: e.target.value})} value={loanForm.therapistId}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-              <input type="date" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-purple-500" value={loanForm.date} onChange={e => setLoanForm({...loanForm, date: e.target.value})} required/>
-              <input type="number" placeholder="ကြိုထုတ်ငွေပမာဏ (ကျပ်)" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-purple-500" value={loanForm.amount} onChange={e => setLoanForm({...loanForm, amount: e.target.value})} required min="0"/>
-              <input type="text" placeholder="မှတ်ချက် (ဥပမာ- ရက်လယ် ကြိုထုတ်ငွေ)" className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-purple-500" value={loanForm.note} onChange={e => setLoanForm({...loanForm, note: e.target.value})} />
-              <button className="w-full bg-purple-700 hover:bg-purple-800 transition-colors text-white p-3 rounded font-bold">ကြိုထုတ်ငွေ စာရင်းသွင်းမည်</button>
+              <h2 className="font-bold text-purple-900 text-lg flex items-center gap-2 mb-2"><Banknote/> ကြိုထုတ်ငွေ / ပြန်ဆပ်ငွေ မှတ်တမ်း</h2>
+              
+              {/* Type Selection */}
+              <div className="flex gap-6 border-b border-slate-200 pb-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="loanType" checked={loanForm.type === 'borrow'} onChange={() => setLoanForm({...loanForm, type: 'borrow'})} className="w-4 h-4 text-purple-600 focus:ring-purple-500" />
+                  <span className="font-bold text-purple-900">ငွေကြိုထုတ်မည်</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="loanType" checked={loanForm.type === 'repay'} onChange={() => setLoanForm({...loanForm, type: 'repay'})} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                  <span className="font-bold text-emerald-700">ပြန်ဆပ်မည်</span>
+                </label>
+              </div>
+
+              <select className={`w-full p-3 border rounded outline-none focus:ring-2 ${loanForm.type === 'borrow' ? 'focus:ring-purple-500' : 'focus:ring-emerald-500'}`} onChange={e => setLoanForm({...loanForm, therapistId: e.target.value})} value={loanForm.therapistId}>{THERAPISTS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+              
+              <input type="date" className={`w-full p-3 border rounded outline-none focus:ring-2 ${loanForm.type === 'borrow' ? 'focus:ring-purple-500' : 'focus:ring-emerald-500'}`} value={loanForm.date} onChange={e => setLoanForm({...loanForm, date: e.target.value})} required/>
+              
+              {/* ပြန်ဆပ်မည်ဆိုလျှင် နည်းလမ်းရွေးရန် */}
+              {loanForm.type === 'repay' && (
+                <select className="w-full p-3 border rounded outline-none focus:ring-2 focus:ring-emerald-500" value={loanForm.repayMethod} onChange={e => setLoanForm({...loanForm, repayMethod: e.target.value})}>
+                  <option value="cash">လက်ငင်းငွေဖြင့် ပြန်ဆပ်မည်</option>
+                  <option value="salary">လစာထဲမှ နှုတ်၍ ပြန်ဆပ်မည်</option>
+                </select>
+              )}
+
+              <input type="number" placeholder={loanForm.type === 'borrow' ? "ကြိုထုတ်ငွေပမာဏ (ကျပ်)" : "ပြန်ဆပ်မည့်ပမာဏ (ကျပ်)"} className={`w-full p-3 border rounded outline-none focus:ring-2 ${loanForm.type === 'borrow' ? 'focus:ring-purple-500' : 'focus:ring-emerald-500'}`} value={loanForm.amount} onChange={e => setLoanForm({...loanForm, amount: e.target.value})} required min="0"/>
+              
+              <input type="text" placeholder="မှတ်ချက် (ရွေးချယ်ရန်)" className={`w-full p-3 border rounded outline-none focus:ring-2 ${loanForm.type === 'borrow' ? 'focus:ring-purple-500' : 'focus:ring-emerald-500'}`} value={loanForm.note} onChange={e => setLoanForm({...loanForm, note: e.target.value})} />
+              
+              <button className={`w-full transition-colors text-white p-3 rounded font-bold ${loanForm.type === 'borrow' ? 'bg-purple-700 hover:bg-purple-800' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                {loanForm.type === 'borrow' ? 'ကြိုထုတ်ငွေ စာရင်းသွင်းမည်' : 'ပြန်ဆပ်ငွေ စာရင်းသွင်းမည်'}
+              </button>
             </form>
 
             <div className="bg-white rounded-xl shadow overflow-hidden border border-slate-200">
               <h3 className="p-4 bg-purple-50 font-bold text-purple-900 border-b flex justify-between">
-                <span>ကြိုထုတ်ငွေ မှတ်တမ်းများ</span>
+                <span>ကြိုထုတ်ငွေ / ပြန်ဆပ်ငွေ မှတ်တမ်းများ</span>
                 <button onClick={handlePrintPDF} className="no-print bg-purple-600 hover:bg-purple-700 transition-colors text-white px-3 py-1 rounded text-xs flex items-center gap-1 shadow">
                   <Download size={12}/> PDF ထုတ်ယူမည်
                 </button>
@@ -336,7 +403,7 @@ export default function App() {
                 <thead className="bg-slate-50 border-b text-slate-600">
                   <tr>
                     <th className="p-3 text-left">ရက်စွဲ / အမည်</th>
-                    <th className="p-3 text-left">မှတ်ချက်</th>
+                    <th className="p-3 text-left">အမျိုးအစား/မှတ်ချက်</th>
                     <th className="p-3 text-right">ပမာဏ</th>
                     <th className="p-3 text-center">ဖျက်ရန်</th>
                   </tr>
@@ -348,9 +415,16 @@ export default function App() {
                         <span className="font-bold">{l.date}</span><br/>
                         <span className="text-emerald-900 font-bold text-xs">{THERAPISTS.find(t=>t.id===l.therapistId)?.name}</span>
                       </td>
-                      <td className="p-3 text-slate-600">{l.note}</td>
-                      <td className="p-3 text-right font-bold text-purple-700">
-                        {Number(l.amount).toLocaleString()} Ks
+                      <td className="p-3">
+                        {l.amount < 0 ? (
+                          <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold mr-2">ပြန်ဆပ်</span>
+                        ) : (
+                          <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold mr-2">ကြိုထုတ်</span>
+                        )}
+                        <span className="text-slate-600">{l.note}</span>
+                      </td>
+                      <td className={`p-3 text-right font-bold ${l.amount > 0 ? 'text-purple-700' : 'text-emerald-600'}`}>
+                        {l.amount > 0 ? '+' : ''}{Number(l.amount).toLocaleString()} Ks
                       </td>
                       <td className="p-3 text-center">
                         <button onClick={() => {if(window.confirm('ဖျက်ရန်သေချာပါသလား?')) deleteDoc(doc(db, 'loans', l.id));}} className="text-slate-400 hover:text-red-600 p-1">
@@ -511,15 +585,27 @@ export default function App() {
               {/* ကြိုထုတ်ငွေ မှတ်တမ်းများ */}
               {selectedTherapist.loanList && selectedTherapist.loanList.length > 0 && (
                 <div className="border-t border-slate-200 pt-4">
-                  <h3 className="text-sm font-bold text-purple-800 mb-3">ကြိုထုတ်ငွေ / ချေးငွေ မှတ်တမ်း</h3>
+                  <h3 className="text-sm font-bold text-purple-800 mb-3 flex justify-between">
+                    ကြိုထုတ်ငွေ / ပြန်ဆပ်ငွေ မှတ်တမ်း
+                    {selectedTherapist.totalLoan > 0 && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">လက်ကျန်: {selectedTherapist.totalLoan.toLocaleString()} Ks</span>}
+                  </h3>
                   <div className="space-y-3">
                     {selectedTherapist.loanList.map((loan: any) => (
-                      <div key={loan.id} className="border border-purple-200 bg-purple-50 p-3 rounded-lg flex flex-col gap-1">
+                      <div key={loan.id} className={`border p-3 rounded-lg flex flex-col gap-1 ${loan.amount > 0 ? 'border-purple-200 bg-purple-50' : 'border-emerald-200 bg-emerald-50 opacity-90'}`}>
                         <div className="flex justify-between items-center">
                           <span className="font-bold text-slate-800 text-sm">{loan.date}</span>
-                          <span className="font-bold text-purple-700">{Number(loan.amount).toLocaleString()} Ks</span>
+                          <span className={`font-bold ${loan.amount > 0 ? 'text-purple-700' : 'text-emerald-700'}`}>
+                            {loan.amount > 0 ? '' : '-'}{Math.abs(Number(loan.amount)).toLocaleString()} Ks
+                          </span>
                         </div>
-                        <p className="text-slate-600 text-sm">{loan.note}</p>
+                        <p className="text-slate-600 text-sm flex items-center gap-2">
+                          {loan.amount < 0 ? (
+                            <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">ပြန်ဆပ်</span>
+                          ) : (
+                            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">ကြိုထုတ်</span>
+                          )}
+                          {loan.note}
+                        </p>
                       </div>
                     ))}
                   </div>
